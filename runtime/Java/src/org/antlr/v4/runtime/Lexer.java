@@ -478,10 +478,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	 */
 	public void performIncludeSourceFile(String fileName)
 	{ 
-		_hitInclude = true; // instruct scanner to prepare for switch of scan source
-		_includeFileName = fileName;
-		_includeSubstFrom = null;
-		_includeSubstTo = null;
+		performIncludeSourceFile(fileName, null, null);
 	}
 
 	/**
