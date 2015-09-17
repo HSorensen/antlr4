@@ -23,6 +23,8 @@ public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource 
 				String replacedStream = beforeStream.replaceAll(substituteFrom,
 						substituteTo);
 				istrm = new ANTLRInputStream(replacedStream);
+				// set filename so it can be found in common token
+				istrm.name=fileName;
 			}
 		} catch (IOException e) {
 			// TODO: Add error handling

@@ -513,6 +513,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		// restore _input and _tokenFactorySourcePair
 		this._input=stackItem.getInput();
 		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair();
+        System.err.println("leaving pop: input is "+_input.getSourceName());
 	}
 
 	/**
@@ -530,9 +531,11 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		// open _includeFileName ...
 		CharStream newfile = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
 		this._input = newfile;
-        this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input);
+		this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
+        
         this._input.seek(0); // ensure position is set
         getInterpreter().reset();
+        System.err.println("leaving push: input is "+_input.getSourceName());
 	}
 	
 	/**
