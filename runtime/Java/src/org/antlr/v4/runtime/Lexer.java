@@ -511,9 +511,12 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		LexerScannerIncludeStateStackItem stackItem ;
 		stackItem=_lexerScannerStateStack.pop();
 		// restore _input and _tokenFactorySourcePair
-		this._input=stackItem.getInput();
-		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair();
-        System.err.println("leaving pop: input is "+_input.getSourceName());
+		int checkSize=0;
+		this._input=stackItem.getInput(); checkSize++;
+		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair(); checkSize++;
+		if (LexerScannerIncludeStateStackItem.SIZE != checkSize) {
+			throw new IllegalStateException("popLexerScanner lexer state not fully restored.");
+		}
 	}
 
 	/**
@@ -535,7 +538,6 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
         
         this._input.seek(0); // ensure position is set
         getInterpreter().reset();
-        System.err.println("leaving push: input is "+_input.getSourceName());
 	}
 	
 	/**

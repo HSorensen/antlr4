@@ -9,6 +9,7 @@ import org.antlr.v4.runtime.misc.Pair;
  * from previous file
  */
 public class LexerScannerIncludeStateStackItem {
+	public final static int SIZE=2;
 	private CharStream input;
     private Pair<TokenSource, CharStream> tokenFactorySourcePair;
     
