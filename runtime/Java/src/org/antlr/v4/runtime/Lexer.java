@@ -528,8 +528,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		}
 		
 		// store current lexer scanner state
-		LexerScannerIncludeStateStackItem stackItem = new LexerScannerIncludeStateStackItem(_input, _tokenFactorySourcePair);
-		_lexerScannerStateStack.push(stackItem);
+		_lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(_input, _tokenFactorySourcePair));
 		
 		// open _includeFileName ...
 		CharStream newfile = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
