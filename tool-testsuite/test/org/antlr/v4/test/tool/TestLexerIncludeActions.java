@@ -30,8 +30,6 @@ public class TestLexerIncludeActions extends BaseTest {
 			"WS: (' '|'\\n') -> skip ;";
 		String found = execLexer("L.g4", grammar, "L", "A B C D #0 N O P");
 		
-		System.err.println("lexer found>"+found+"<");
-		
 		// clean up test files
 		f[0].delete();
 		f[1].delete();
@@ -76,8 +74,6 @@ public class TestLexerIncludeActions extends BaseTest {
 			"CP: '#' ('0'|'1') { performIncludeSourceFile(\""+path+"test_\"+getText()+\".test\", \"Z\", \"E\" ); skip(); };\n" +
 			"WS: (' '|'\\n') -> skip ;";
 		String found = execLexer("L.g4", grammar, "L", "A B C D #0 N O P");
-		
-		System.err.println("lexer found>"+found+"<");
 		
 		// clean up test files
 		f[0].delete();
