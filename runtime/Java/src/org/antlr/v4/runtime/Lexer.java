@@ -109,7 +109,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	 * Needed to handling grammars that allow to include 
 	 * new content into the current scanning stream. 
 	 */
-	public final Stack<LexerScannerStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerStateStackItem>(); 
+	public final Stack<LexerScannerIncludeStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerIncludeStateStackItem>(); 
 
 	public LexerScannerIncludeSource _lexerScannerIncludeSource = new LexerScannerIncludeSourceImpl();
 	
@@ -508,7 +508,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		if (_lexerScannerStateStack.isEmpty() == true) {
 			throw new IllegalStateException("popLexerScanner cannot operate on empty stack.");
 		}
-		LexerScannerStateStackItem stackItem ;
+		LexerScannerIncludeStateStackItem stackItem ;
 		stackItem=_lexerScannerStateStack.pop();
 		// restore _input and _tokenFactorySourcePair
 		this._input=stackItem.getInput();
@@ -525,7 +525,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		}
 		
 		// store current lexer scanner state
-		LexerScannerStateStackItem stackItem = new LexerScannerStateStackItem(_input, _tokenFactorySourcePair);
+		LexerScannerIncludeStateStackItem stackItem = new LexerScannerIncludeStateStackItem(_input, _tokenFactorySourcePair);
 		_lexerScannerStateStack.push(stackItem);
 		
 		// open _includeFileName ...

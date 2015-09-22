@@ -1,15 +1,18 @@
 package org.antlr.v4.runtime;
 
-//import org.antlr.v4.runtime.atn.LexerATNSimulatorState;
 import org.antlr.v4.runtime.misc.Pair;
 
-public class LexerScannerStateStackItem {
+
+/**
+ * LexerScannerIncludeStateStackItem
+ * Item needed for maintain scanner state when restoring scanning 
+ * from previous file
+ */
+public class LexerScannerIncludeStateStackItem {
 	private CharStream input;
     private Pair<TokenSource, CharStream> tokenFactorySourcePair;
-    //private Integer streamRef;
-    //private LexerATNSimulatorState lexerATNSimulatorState;
     
-	public LexerScannerStateStackItem(CharStream input,
+	public LexerScannerIncludeStateStackItem(CharStream input,
 			Pair<TokenSource, CharStream> tokenFactorySourcePair) {
 		this.input = input;
 		this.tokenFactorySourcePair = tokenFactorySourcePair;
