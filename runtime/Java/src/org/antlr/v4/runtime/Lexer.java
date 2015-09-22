@@ -531,8 +531,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		_lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(_input, _tokenFactorySourcePair));
 		
 		// open _includeFileName ...
-		CharStream newfile = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
-		this._input = newfile;
+		this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
 		this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
         
         this._input.seek(0); // ensure position is set
