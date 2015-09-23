@@ -1,6 +1,60 @@
-# ANTLR v4
+# Fork of ANTLR v4
 
 **ANTLR** (ANother Tool for Language Recognition) is a powerful parser generator for reading, processing, executing, or translating structured text or binary files. It's widely used to build languages, tools, and frameworks. From a grammar, ANTLR generates a parser that can build parse trees and also generates a listener interface (or visitor) that makes it easy to respond to the recognition of phrases of interest.
+
+## About this fork
+
+This fork is an attempt to solve inclusion of source into the scanning step using ANTLR natively.
+
+Analyzing grammars for programming languages like **C**, **PL/I** or **COBOL** requires support for handling inclusion of source into the scanning stream. C uses `#include`, PL/I uses `%INCLUDE` and COBOL uses `COPY`.
+ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code 
+before invoking ANTLR.  
+
+The current version is very much WIP and focuses on Java target platform. If you use this fork, expect things to break until the interface has solidified. 
+
+### Background
+#### version 1: a hasty hack
+* [rfc v1 issue #305](https://github.com/antlr/antlr4/issues/305)
+* [rfc v1 pull request #306](https://github.com/antlr/antlr4/pull/306)
+
+#### version 2: much improved simplified interface
+* [rfc v2 pull request #979](https://github.com/antlr/antlr4/pull/979)
+
+### How does it work
+
+A new lexer grammar action has been defined:
+
+* performIncludeSourceFile
+
+Sample lexer grammar:
+
+10. `lexer grammar L;`
+20. `I : 'A'..'Z' ;`
+20. `CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };`
+40. `WS: (' '|'\n') -> skip ;`
+
+Sample source to scan `"A B C D #0 N O P"`, when `#0` is read the grammar action `performIncludeSourceFile` is invoked with the parameter `"#0"`. Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"`. 
+
+Using ANTLR to retrieve all the tokens would give:
+
+- [@0,0:0=`'A'`,<1>,1:0] <== offset zero from original file
+- [@1,2:2=`'B'`,<1>,1:2] <== original file
+- [@2,4:4=`'C'`,<1>,1:4] <== original file
+- [@3,6:6=`'D'`,<1>,1:6] <== original file
+- [@4,0:0=`'E'`,<1>,1:0] <== offset zero from file `#0`
+- [@5,2:2=`'F'`,<1>,1:2] <== File `#0`
+- [@6,4:4=`'G'`,<1>,1:4] <== File `#0`
+- [@7,0:0=`'H'`,<1>,1:0] <== offset zero from file `#1`
+- [@8,2:2=`'I'`,<1>,1:2] <== File `#1`
+- [@9,4:4=`'J'`,<1>,1:4] <== File `#1`
+- [@10,6:6=`'K'`,<1>,1:6] <== File `#1`
+- [@11,9:9=`'L'`,<1>,1:8] <== File `#0` (todo: fix offset. should have been 9)
+- [@12,11:11=`'M'`,<1>,1:10] <== File `#0` (todo: fix offset. should have been 11)
+- [@13,11:11=`'N'`,<1>,1:12] <== original file (todo: fix offset. should have been 11)
+- [@14,13:13=`'O'`,<1>,1:14] <== original file (todo: fix offset. should have been 13)
+- [@15,15:15=`'P'`,<1>,1:16] <== original file (todo: fix offset. should have been 15)
+- [@16,16:15=`'<EOF>'`,<-1>,1:17] <== original file `DONE` (todo: fix offset. should have been 16)
+
 
 ## Authors and major contributors
 
@@ -9,6 +63,7 @@ ANTLR project lead and supreme dictator for life
 [University of San Francisco](http://www.usfca.edu/)
 * [Sam Harwell](http://tunnelvisionlabs.com/) (Tool co-author, Java and C# target)
 * Eric Vergnaud (Javascript, Python2, Python3 targets and significant work on C# target)
+* Henrik Sorensen (Freedom Hacker leading the rebellion adding include support to ANTLR)
 
 ## Useful information
 
