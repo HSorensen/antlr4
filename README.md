@@ -12,6 +12,8 @@ before invoking ANTLR. This fork is adding new grammar lexer actions to address 
 
 The current version is very much WIP and focuses on Java target platform. If you use this fork, expect things to break until the interface has solidified. 
 
+Once the inclusion of files work properly it is possible to add support for macro expansion as well by using same concept.
+
 ### Background
 #### ~~version 1: a hasty hack~~
 * ~~[rfc v1 issue #305](https://github.com/antlr/antlr4/issues/305)~~
@@ -28,10 +30,12 @@ A new lexer grammar action has been defined:
 
 Sample lexer grammar:
 
-10. `lexer grammar L;`
-20. `I : 'A'..'Z' ;`
-20. `CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };`
-40. `WS: (' '|'\n') -> skip ;`
+```antlr
+lexer grammar L;
+I : 'A'..'Z' ;
+CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };
+WS: (' '|'\n') -> skip ;
+```
 
 Sample source to scan `"A B C D #0 N O P"`, when `#0` is read the grammar action `performIncludeSourceFile` is invoked with the parameter `"#0"`. When `performIncludeSourceFile` is invoked it instructs the lexer to get the next set of tokens using the parameter as filename to be read.
 
