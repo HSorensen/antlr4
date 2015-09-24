@@ -8,14 +8,14 @@ This fork is an attempt to solve inclusion of source into the scanning step usin
 
 Analyzing grammars for programming languages like **C**, **PL/I** or **COBOL** requires support for handling inclusion of source into the scanning stream. C uses `#include`, PL/I uses `%INCLUDE` and COBOL uses `COPY`.
 ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code 
-before invoking ANTLR.  
+before invoking ANTLR. This fork is adding new grammar lexer actions to address the inclusion of source code as part of the lexer grammar itself. 
 
 The current version is very much WIP and focuses on Java target platform. If you use this fork, expect things to break until the interface has solidified. 
 
 ### Background
-#### version 1: a hasty hack
-* [rfc v1 issue #305](https://github.com/antlr/antlr4/issues/305)
-* [rfc v1 pull request #306](https://github.com/antlr/antlr4/pull/306)
+#### ~~version 1: a hasty hack~~
+* ~~[rfc v1 issue #305](https://github.com/antlr/antlr4/issues/305)~~
+* ~~[rfc v1 pull request #306](https://github.com/antlr/antlr4/pull/306)~~
 
 #### version 2: much improved simplified interface
 * [rfc v2 pull request #979](https://github.com/antlr/antlr4/pull/979)
