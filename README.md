@@ -33,7 +33,9 @@ Sample lexer grammar:
 20. `CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };`
 40. `WS: (' '|'\n') -> skip ;`
 
-Sample source to scan `"A B C D #0 N O P"`, when `#0` is read the grammar action `performIncludeSourceFile` is invoked with the parameter `"#0"`. Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"`. 
+Sample source to scan `"A B C D #0 N O P"`, when `#0` is read the grammar action `performIncludeSourceFile` is invoked with the parameter `"#0"`. When `performIncludeSourceFile` is invoked it instructs the lexer to get the next set of tokens using the parameter as filename to be read.
+
+Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"`. 
 
 Using ANTLR to retrieve all the tokens would give:
 
@@ -48,12 +50,24 @@ Using ANTLR to retrieve all the tokens would give:
 - [@8,2:2=`'I'`,<1>,1:2] <== File `#1`
 - [@9,4:4=`'J'`,<1>,1:4] <== File `#1`
 - [@10,6:6=`'K'`,<1>,1:6] <== File `#1`
-- [@11,9:9=`'L'`,<1>,1:8] <== File `#0` (todo: fix offset. should have been 9)
-- [@12,11:11=`'M'`,<1>,1:10] <== File `#0` (todo: fix offset. should have been 11)
-- [@13,11:11=`'N'`,<1>,1:12] <== original file (todo: fix offset. should have been 11)
-- [@14,13:13=`'O'`,<1>,1:14] <== original file (todo: fix offset. should have been 13)
-- [@15,15:15=`'P'`,<1>,1:16] <== original file (todo: fix offset. should have been 15)
-- [@16,16:15=`'<EOF>'`,<-1>,1:17] <== original file `DONE` (todo: fix offset. should have been 16)
+- [@11,9:9=`'L'`,<1>,1:9] <== File `#0`
+- [@12,11:11=`'M'`,<1>,1:11] <== File `#0`
+- [@13,11:11=`'N'`,<1>,1:11] <== original file
+- [@14,13:13=`'O'`,<1>,1:13] <== original file
+- [@15,15:15=`'P'`,<1>,1:15] <== original file
+- [@16,16:15=`'<EOF>'`,<-1>,1:16] <== original file `DONE`
+
+Sample program:
+```java
+L lex = new L(input);
+CommonTokenStream tokens = new CommonTokenStream(lex);
+tokens.fill();
+for (Token t : tokens.getTokens()) {
+    System.out.print(t);
+    if (t instanceof CommonToken) { System.out.print(","+((CommonToken)t).getInputStream().getSourceName()); }
+    System.out.println("");
+}
+```
 
 
 ## Authors and major contributors
