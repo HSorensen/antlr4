@@ -68,6 +68,7 @@ CommonTokenStream tokens = new CommonTokenStream(lex);
 tokens.fill();
 for (Token t : tokens.getTokens()) {
     System.out.print(t);
+    // Show filename where token originates from
     if (t instanceof CommonToken) { System.out.print(","+((CommonToken)t).getInputStream().getSourceName()); }
     System.out.println("");
 }
