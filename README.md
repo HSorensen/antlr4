@@ -87,7 +87,49 @@ public class IncludeScannerSource extends LexerScannerIncludeSourceImpl implemen
 }
 ```
 
+### Implementation considerations
+Looking at the richness of the ANTLR implementation it can be daunting to try to locate a safe spot where the Lexer can be taught to read the next set of tokens from a new file, and once the new file is completely read, continue reading from the original file as if nothing had happened. Examining at how ANTLR reads the whole file into a buffer makes things a bit easier and it should reduce any side effects the IO system might have on a solution. Another consideration is to avoid interference with the decision making part of ANTLR. These considerations led to the `Lexer.nextToken()` method as I figured all the necessary decisions and actions needed on the current token most be completed and the Lexer is ready to receive next token. 
 
+Create a new lexer grammar action `Lexer.performIncludeSourceFile(...)` this will capture the string the lexer has found and will set a flag that this event has happened:
+```java
+public void performIncludeSourceFile(String fileName)
+{ 
+    _hitInclude = true; // instruct scanner to prepare for switch of scan source
+    _includeFileName = fileName;
+}
+```
+
+
+In `Lexer.nextToken()` check if `_hitInclude` is set and act accordingly
+```java
+if (_hitInclude) {
+    // store current lexer state, and open _includeFileName for reading.
+    pushLexerScannerState( );
+    _hitInclude=false;                  
+}
+```                 
+
+Also in `Lexer.nextToken()` check if `hitEOF` is set and if the `EOF` is from a stacked file or from the original input file:
+```java
+if (_hitEOF) {
+    // check if any input has been stacked
+    if (!_lexerScannerStateStack.isEmpty()) {
+        popLexerScannerState( );
+        _hitEOF = false;
+    } else {
+        emitEOF();
+        return _token;
+    }
+}
+```
+
+After some experimenting the needed set of Lexer attributes to maintain the lexer state before and after the inclusion of the new file as implemented by `Lexer.pushLexerScannerState()` and `Lexer.popLexerScannerState()` were surprisingly few:
+```java
+CharStream input;
+Pair<TokenSource, CharStream> tokenFactorySourcePair;
+int line;
+int charPosInLine;
+``` 
 
 ## Authors and major contributors
 
