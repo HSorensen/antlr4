@@ -74,6 +74,20 @@ for (Token t : tokens.getTokens()) {
 }
 ```
 
+When dealing with locating files to include it is quite often necessary to search through multiple directories, or to add extensions to the string the lexer has recognized. To enable these kind of filename manipulations the lexer provides a method `setLexerScannerIncludeSource` that can be used to override the default behavior.
+
+```java 
+lex.setLexerScannerIncludeSource(new IncludeScannerSource());
+public class IncludeScannerSource extends LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource {
+  @Override
+  public CharStream embedSource(String fName, String substituteFrom, String substituteTo) {
+    String fileName = "COBOL/COPYBOOKS/"+fName;
+    return super.embedSource(fileName, substituteFrom, substituteTo);
+  }
+}
+```
+
+
 
 ## Authors and major contributors
 
