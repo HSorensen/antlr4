@@ -34,6 +34,7 @@ import org.antlr.v4.runtime.misc.IntegerStack;
 import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.misc.Pair;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EmptyStackException;
 import java.util.List;
@@ -539,12 +540,20 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 				                                                         , getInterpreter().getLine()
 				                                                         , getInterpreter().getCharPositionInLine()));
 		
-		// open _includeFileName ...
-		this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
-		this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
-        
-        this._input.seek(0); // ensure position is set
-        getInterpreter().reset();
+			// open _includeFileName ...
+			this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
+			
+			if (this._input==null) {
+				// restore input
+				this._input=_lexerScannerStateStack.peek().getInput();
+			  _lexerScannerStateStack.pop();
+			}
+			else {
+				this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
+		        
+		        this._input.seek(0); // ensure position is set
+		        getInterpreter().reset();
+			}
 	}
 	
 	/**

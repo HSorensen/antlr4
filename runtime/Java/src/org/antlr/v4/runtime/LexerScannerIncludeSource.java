@@ -37,7 +37,7 @@ public interface LexerScannerIncludeSource {
 	
 	/**
 	 * The embedSource method reads the fileName and optionally substitutes text
-	 * before returning the CharStream for the file.
+	 * before returning the CharStream for the file or returning null in case of errors
 	 */
 	public CharStream embedSource(String fileName, String substituteFrom, String substituteTo);
 	

@@ -40,6 +40,7 @@ public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource 
 	/**
 	 * The embedSource method reads the fileName and optionally substitutes text
 	 * before returning the CharStream for the file.
+	 * Returns null if an error happended.
 	 */
 	public CharStream embedSource(String fileName, String substituteFrom, String substituteTo) {
 		ANTLRInputStream istrm = null;
@@ -57,6 +58,7 @@ public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource 
 		} catch (IOException e) {
 			// TODO: Add error handling
 			e.printStackTrace();
+			istrm=null;
 		}
 
 		return istrm;
