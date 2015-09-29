@@ -4,7 +4,7 @@
 
 ## About this fork
 
-This fork is an attempt to solve inclusion of source into the scanning step using ANTLR natively.
+This fork is an attempt to solve inclusion of source into the scanning step using ANTLR natively. Currently Java is the only supported target.
 
 Analyzing grammars for programming languages like **C**, **PL/I** or **COBOL** requires support for handling inclusion of source into the scanning stream. C uses `#include`, PL/I uses `%INCLUDE` and COBOL uses `COPY`.
 ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code 
