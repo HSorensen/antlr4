@@ -31,10 +31,10 @@ A new lexer grammar action has been defined:
 Sample lexer grammar:
 
 ```antlr
-lexer grammar L;
-I : 'A'..'Z' ;
-CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };
-WS: (' '|'\n') -> skip ;
+    lexer grammar L;
+    I : 'A'..'Z' ;
+    CP: '#' ('0'|'1') { performIncludeSourceFile(getText()); skip(); };
+    WS: (' '|'\n') -> skip ;
 ```
 
 Sample source to scan `"A B C D #0 N O P"`, when `#0` is read the grammar action `performIncludeSourceFile` is invoked with the parameter `"#0"`. When `performIncludeSourceFile` is invoked it instructs the lexer to get the next set of tokens using the parameter as filename to be read.
@@ -63,73 +63,109 @@ Using ANTLR to retrieve all the tokens would give:
 
 Sample program:
 ```java
-L lex = new L(input);
-CommonTokenStream tokens = new CommonTokenStream(lex);
-tokens.fill();
-for (Token t : tokens.getTokens()) {
-    System.out.print(t);
-    // Show filename where token originates from
-    if (t instanceof CommonToken) { System.out.print(","+((CommonToken)t).getInputStream().getSourceName()); }
-    System.out.println("");
-}
+    L lex = new L(input);
+    CommonTokenStream tokens = new CommonTokenStream(lex);
+    tokens.fill();
+    for (Token t : tokens.getTokens()) {
+        System.out.print(t);
+        // Show filename where token originates from
+        if (t instanceof CommonToken) { System.out.print(","+((CommonToken)t).getInputStream().getSourceName()); }
+        System.out.println("");
+    }
 ```
 
 When dealing with locating files to include it is quite often necessary to search through multiple directories, or to add extensions to the string the lexer has recognized. To enable these kind of filename manipulations the lexer provides a method `setLexerScannerIncludeSource` that can be used to override the default behavior.
 
 ```java 
-lex.setLexerScannerIncludeSource(new IncludeScannerSource());
-public class IncludeScannerSource extends LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource {
-  @Override
-  public CharStream embedSource(String fName, String substituteFrom, String substituteTo) {
-    String fileName = "COBOL/COPYBOOKS/"+fName;
-    return super.embedSource(fileName, substituteFrom, substituteTo);
-  }
-}
+    lex.setLexerScannerIncludeSource(new IncludeScannerSource());
+    public class IncludeScannerSource extends LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource {
+      @Override
+      public CharStream embedSource(String fName, String substituteFrom, String substituteTo) {
+        String fileName = "COBOL/COPYBOOKS/"+fName;
+        return super.embedSource(fileName, substituteFrom, substituteTo);
+      }
+    }
 ```
 
 ### Implementation considerations
 Looking at the richness of the ANTLR implementation it can be daunting to try to locate a safe spot where the Lexer can be taught to read the next set of tokens from a new file, and once the new file is completely read, continue reading from the original file as if nothing had happened. Examining at how ANTLR reads the whole file into a buffer makes things a bit easier and it should reduce any side effects the IO system might have on a solution. Another consideration is to avoid interference with the decision making part of ANTLR. These considerations led to the `Lexer.nextToken()` method as I figured all the necessary decisions and actions needed on the current token most be completed and the Lexer is ready to receive next token. 
 
-Create a new lexer grammar action `Lexer.performIncludeSourceFile(...)` this will capture the string the lexer has found and will set a flag that this event has happened:
+Create a new lexer grammar action `Lexer.performIncludeSourceFile(...)` that will capture the string the lexer has found and will set a flag that a request happened:
 ```java
-public void performIncludeSourceFile(String fileName)
-{ 
-    _hitInclude = true; // instruct scanner to prepare for switch of scan source
-    _includeFileName = fileName;
-}
+    public void performIncludeSourceFile(String fileName)
+    { 
+        _hitInclude = true; // instruct scanner to prepare for switch of scan source
+        _includeFileName = fileName;
+    }
 ```
 
 
 In `Lexer.nextToken()` check if `_hitInclude` is set and act accordingly
 ```java
-if (_hitInclude) {
-    // store current lexer state, and open _includeFileName for reading.
-    pushLexerScannerState( );
-    _hitInclude=false;                  
-}
+    if (_hitInclude) {
+        // store current lexer state, and open _includeFileName for reading.
+        pushLexerScannerState( );
+        _hitInclude=false;                  
+    }
 ```                 
 
 Also in `Lexer.nextToken()` check if `hitEOF` is set and if the `EOF` is from a stacked file or from the original input file:
 ```java
-if (_hitEOF) {
-    // check if any input has been stacked
-    if (!_lexerScannerStateStack.isEmpty()) {
-        popLexerScannerState( );
-        _hitEOF = false;
-    } else {
-        emitEOF();
-        return _token;
+    if (_hitEOF) {
+        // check if any input has been stacked
+        if (!_lexerScannerStateStack.isEmpty()) {
+            popLexerScannerState( );
+            _hitEOF = false;
+        } else {
+            emitEOF();
+            return _token;
+        }
     }
-}
 ```
 
-After some experimenting the needed set of Lexer attributes to maintain the lexer state before and after the inclusion of the new file as implemented by `Lexer.pushLexerScannerState()` and `Lexer.popLexerScannerState()` were surprisingly few:
+After some experimenting only a small set of lexer attributes are needed to maintain the lexer state before and after the inclusion of the new file as implemented by `Lexer.pushLexerScannerState()` and `Lexer.popLexerScannerState()`:
 ```java
-CharStream input;
-Pair<TokenSource, CharStream> tokenFactorySourcePair;
-int line;
-int charPosInLine;
+    CharStream input;
+    Pair<TokenSource, CharStream> tokenFactorySourcePair;
+    int line;
+    int charPosInLine;
 ``` 
+
+
+In `Lexer.pushLexerScannerState()` the current state of the relevant lexer attributes are pushed to a simple stack and the `CharStream` for new filename is returned by the `_lexerScannerIncludeSource.embedSource(...)` method:
+```java
+    public void pushLexerScannerState() {
+        // store current lexer scanner state
+        _lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(_input
+                                                                         , _tokenFactorySourcePair
+                                                                         , getInterpreter().getLine()
+                                                                         , getInterpreter().getCharPositionInLine()));
+        // open _includeFileName ...
+        this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
+        this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
+        this._input.seek(0); // ensure position is set
+        getInterpreter().reset();
+    }
+```
+
+
+When `EOF` is met for the new file then `Lexer.popLexerScannerState()` will restore the lexer attributes from the stack:
+```java
+    public void popLexerScannerState() {
+        LexerScannerIncludeStateStackItem stackItem=_lexerScannerStateStack.pop();
+        // restore _input, _tokenFactorySourcePair, line and charPosInLine
+        this._input=stackItem.getInput();
+        this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair();
+        getInterpreter().setLine(stackItem.getLine());
+        getInterpreter().setCharPositionInLine(stackItem.getCharPosInLine());        
+    }
+```
+
+There are of course other ways to implement the include feature into ANTLR proper. This version works very well for me and let me know if it does or does not work for you.
+
+Henrik 
+
+
 
 ## Authors and major contributors
 
