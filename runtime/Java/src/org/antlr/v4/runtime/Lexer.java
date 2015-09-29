@@ -512,9 +512,8 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		if (_lexerScannerStateStack.isEmpty() == true) {
 			throw new IllegalStateException("popLexerScanner cannot operate on empty stack.");
 		}
-		LexerScannerIncludeStateStackItem stackItem ;
-		stackItem=_lexerScannerStateStack.pop();
-		// restore _input, _tokenFactorySourcePair, line and charposinline
+		LexerScannerIncludeStateStackItem stackItem=_lexerScannerStateStack.pop(); ;
+		// restore _input, _tokenFactorySourcePair, line and charPosInLine
 		int checkSize=0;
 		this._input=stackItem.getInput(); checkSize++;
 		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair(); checkSize++;
