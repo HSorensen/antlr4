@@ -37,7 +37,9 @@ import org.antlr.v4.runtime.tree.Trees;
 
 import javax.print.PrintException;
 import javax.swing.*;
+
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -92,7 +94,7 @@ import java.util.concurrent.Future;
  *
  *  @see ParserRuleContext
  */
-public class RuleContext implements RuleNode {
+public class RuleContext implements RuleNode, Serializable {
 	public static final ParserRuleContext EMPTY = new ParserRuleContext();
 
 	/** What context invoked this rule? */

@@ -29,13 +29,14 @@
 package org.antlr.v4.runtime;
 
 import java.io.IOException;
+import java.io.Serializable;
 
 /**
  * Implementation of interface that allow the lexer to include another file
  * into the scanning stream.
  * The lexer expects a CharStream object to be returned.
  */
-public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource {
+public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource, Serializable {
 	
 	/**
 	 * The embedSource method reads the fileName and optionally substitutes text
