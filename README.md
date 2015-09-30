@@ -6,15 +6,20 @@
 
 This fork is an attempt to solve inclusion of source into the scanning step using ANTLR natively. Currently Java is the only supported target.
 
+## Major Differences from mainline ANTLR
+
+- Include Source Support
+- Serializable ParseTree
+
+### Include Source Support: Background
+
 Analyzing grammars for programming languages like **C**, **PL/I** or **COBOL** requires support for handling inclusion of source into the scanning stream. C uses `#include`, PL/I uses `%INCLUDE` and COBOL uses `COPY`.
-ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code 
-before invoking ANTLR. This fork is adding new grammar lexer actions to address the inclusion of source code as part of the lexer grammar itself. 
+ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code before invoking ANTLR. This fork is adding new grammar lexer actions to address the inclusion of source code as part of the lexer grammar itself. 
 
 The current version is very much WIP and focuses on Java target platform. If you use this fork, expect things to break until the interface has solidified. 
 
 Once the inclusion of files work properly it is possible to add support for macro expansion as well by using same concept.
 
-### Background
 #### ~~version 1: a hasty hack~~
 * ~~[rfc v1 issue #305](https://github.com/antlr/antlr4/issues/305)~~
 * ~~[rfc v1 pull request #306](https://github.com/antlr/antlr4/pull/306)~~
@@ -22,7 +27,7 @@ Once the inclusion of files work properly it is possible to add support for macr
 #### version 2: much improved simplified interface
 * [rfc v2 pull request #979](https://github.com/antlr/antlr4/pull/979)
 
-### How does it work
+### Include Source Support: How does it work
 
 A new lexer grammar action has been defined:
 
@@ -87,7 +92,7 @@ When dealing with locating files to include it is quite often necessary to searc
     }
 ```
 
-### Implementation considerations
+### Include Source Support: Implementation considerations
 Looking at the richness of the ANTLR implementation it can be daunting to try to locate a safe spot where the Lexer can be taught to read the next set of tokens from a new file, and once the new file is completely read, continue reading from the original file as if nothing had happened. Examining at how ANTLR reads the whole file into a buffer makes things a bit easier and it should reduce any side effects the IO system might have on a solution. Another consideration is to avoid interference with the decision making part of ANTLR. These considerations led to the `Lexer.nextToken()` method as I figured all the necessary decisions and actions needed on the current token most be completed and the Lexer is ready to receive next token. 
 
 Create a new lexer grammar action `Lexer.performIncludeSourceFile(...)` that will capture the string the lexer has found and will set a flag that a request happened:
@@ -163,7 +168,42 @@ When `EOF` is met for the new file then `Lexer.popLexerScannerState()` will rest
 
 There are of course other ways to implement the include feature into ANTLR proper. This version works very well for me and let me know if it does or does not work for you.
 
-Henrik 
+### Serializable Parse Tree
+
+I was looking into serializing the ParseTree and much to my surprise only 7 classes need to implement the Serializable interface:
+```java
+public class RuleContext implements RuleNode, Serializable { }
+public class TerminalNodeImpl implements TerminalNode, Serializable { }
+public abstract class ATNSimulator implements Serializable { }
+public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, Serializable { }
+public class CommonTokenFactory implements TokenFactory<CommonToken>, Serializable { }
+public class ANTLRInputStream implements CharStream, Serializable { }
+public class IntegerList implements Serializable { }
+```
+
+With these changes it becomes straight forward to store the parse tree:
+```java
+        parser.setBuildParseTree(true);
+        ParseTree tree = parser.program();
+        OutputStream outputStream = new FileOutputStream("program.parsetree");
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream);
+        objectOutputStream.writeObject(tree);
+        objectOutputStream.close();
+```
+
+and retrieving the parse tree
+```java
+        InputStream inputStream = new FileInputStream("program.parsetree");
+        ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+        ParseTree tree=(ParseTree) objectInputStream.readObject();
+        objectInputStream.close();
+```
+
+Some background:
+I need to run several static source code analysis using many different tree visitors and tree walkers, some of the analysis if done in foreground other in background.
+The language I am parsing supports inclusion of source files, and it is common to have literally 100's of files that all need to be parsed together, with the serialized parse-tree there is just one file to maintain. Alternatively to serializing the parse tree I would have to maintain all these files together and recreate the parse tree every time I need it.
+
+I realize that this feature probably make most sense for the use case that need to support inclusion of source code see [ANTLR fork](https://github.com/HSorensen/antlr4/tree/lexerinclude) or [commit ddf9a331](https://github.com/HSorensen/antlr4/commit/ddf9a3311379870f01122fa1a850c329a5bdca34)
 
 
 
