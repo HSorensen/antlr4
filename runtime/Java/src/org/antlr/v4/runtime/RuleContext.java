@@ -157,18 +157,37 @@ public class RuleContext implements RuleNode, Serializable {
 	 */
 	@Override
 	public String getText() {
+		return getText("");
+	}
+
+	/** Return the combined text of all child nodes separated by a string. 
+	 *  This method only considers tokens which have been added to the parse tree.
+	 *  <p>
+	 *  Since tokens on hidden channels (e.g. whitespace or comments) are not
+	 *  added to the parse trees, they will not appear in the output of this
+	 *  method.
+	 */
+	@Override
+	public String getText(String separator) {
 		if (getChildCount() == 0) {
 			return "";
 		}
-
+		
 		StringBuilder builder = new StringBuilder();
 		for (int i = 0; i < getChildCount(); i++) {
-			builder.append(getChild(i).getText());
+			builder.append(getChild(i).getText(separator));
+			// check if recursion already appended a separator, and if not append it
+			if (separator.length()>0
+			&&  builder.length()>=separator.length()
+			&& !builder.substring(builder.length()-separator.length()).equals(separator)) {
+				builder.append(separator);
+			}
 		}
 
 		return builder.toString();
 	}
 
+	
 	public int getRuleIndex() { return -1; }
 
 	@Override

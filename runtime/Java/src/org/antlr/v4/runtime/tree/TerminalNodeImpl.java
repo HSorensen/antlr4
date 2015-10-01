@@ -74,6 +74,9 @@ public class TerminalNodeImpl implements TerminalNode, Serializable {
 	public String getText() { return symbol.getText(); }
 
 	@Override
+	public String getText(String seperator) { return symbol.getText(); }
+
+	@Override
 	public String toStringTree(Parser parser) {
 		return toString();
 	}
