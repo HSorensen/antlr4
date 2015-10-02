@@ -10,6 +10,7 @@ This fork is an attempt to solve inclusion of source into the scanning step usin
 
 - Include Source Support
 - Serializable ParseTree
+- ParseTree.getText( ) with separator
 
 ### Include Source Support: Background
 
@@ -204,6 +205,16 @@ I need to run several static source code analysis using many different tree visi
 The language I am parsing supports inclusion of source files, and it is common to have literally 100's of files that all need to be parsed together, with the serialized parse-tree there is just one file to maintain. Alternatively to serializing the parse tree I would have to maintain all these files together and recreate the parse tree every time I need it.
 
 I realize that this feature probably make most sense for the use case that need to support inclusion of source code see [ANTLR fork](https://github.com/HSorensen/antlr4/tree/lexerinclude) or [commit ddf9a331](https://github.com/HSorensen/antlr4/commit/ddf9a3311379870f01122fa1a850c329a5bdca34)
+
+### ParseTree.getText( ) with separator
+When using a tree visitor to analyze a parse tree it can be convenient to use getText( ) to see the original source code within a given context. The standard getText( ) method simply returns all the tokens as text but for complicated statements that is not useful.
+Standard way:
+`IFCODE='05'OR'06'OR'07'MOVE'Y'TOBULKELSEMOVE' 'TOBULK`
+
+getText(" "), space as separator:
+`IF CODE = '05' OR '06' OR '07' MOVE 'Y' TO BULK ELSE MOVE ' ' TO BULK`
+
+See [commit 21e68192](https://github.com/HSorensen/antlr4/commit/21e681921f6edc8ed0c0fa9e349bfa3e5fbb1b1e) for details.
 
 
 
