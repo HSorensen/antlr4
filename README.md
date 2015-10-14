@@ -200,7 +200,7 @@ and retrieving the parse tree
         objectInputStream.close();
 ```
 
-Using the Apache Commons Compression routines can yield really good compression ratio of 90%.
+Using the [Apache Commons Compression](http://commons.apache.org/proper/commons-compress) routines can yield really good compression ratio of 90%.
 Write compressed parse tree
 ```java
         parser.setBuildParseTree(true);
