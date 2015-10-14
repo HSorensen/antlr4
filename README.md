@@ -173,13 +173,13 @@ There are of course other ways to implement the include feature into ANTLR prope
 
 When looking into serializing the ParseTree and only 7 classes needed to implement the Serializable interface:
 ```java
-public class RuleContext implements RuleNode, **Serializable** { }
-public class TerminalNodeImpl implements TerminalNode, **Serializable** { }
-public abstract class ATNSimulator implements **Serializable** { }
-public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, **Serializable** { }
-public class CommonTokenFactory implements TokenFactory<CommonToken>, **Serializable** { }
-public class ANTLRInputStream implements CharStream, **Serializable** { }
-public class IntegerList implements **Serializable** { }
+public class RuleContext implements RuleNode, Serializable { }
+public class TerminalNodeImpl implements TerminalNode, Serializable { }
+public abstract class ATNSimulator implements Serializable { }
+public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, Serializable { }
+public class CommonTokenFactory implements TokenFactory<CommonToken>, Serializable { }
+public class ANTLRInputStream implements CharStream, Serializable { }
+public class IntegerList implements Serializable { }
 ```
 
 With these changes it becomes straight forward to store the parse tree:
