@@ -173,13 +173,13 @@ There are of course other ways to implement the include feature into ANTLR prope
 
 When looking into serializing the ParseTree and only 7 classes needed to implement the Serializable interface:
 ```java
-public class RuleContext implements RuleNode, Serializable { }
-public class TerminalNodeImpl implements TerminalNode, Serializable { }
-public abstract class ATNSimulator implements Serializable { }
-public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, Serializable { }
-public class CommonTokenFactory implements TokenFactory<CommonToken>, Serializable { }
-public class ANTLRInputStream implements CharStream, Serializable { }
-public class IntegerList implements Serializable { }
+public class RuleContext implements RuleNode, **Serializable** { }
+public class TerminalNodeImpl implements TerminalNode, **Serializable** { }
+public abstract class ATNSimulator implements **Serializable** { }
+public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, **Serializable** { }
+public class CommonTokenFactory implements TokenFactory<CommonToken>, **Serializable** { }
+public class ANTLRInputStream implements CharStream, **Serializable** { }
+public class IntegerList implements **Serializable** { }
 ```
 
 With these changes it becomes straight forward to store the parse tree:
@@ -200,11 +200,40 @@ and retrieving the parse tree
         objectInputStream.close();
 ```
 
+Using the Apache Commons Compression routines can yield really good compression ratio of 90%.
+Write compressed parse tree
+```java
+        parser.setBuildParseTree(true);
+        ParseTree tree = parser.program();
+        OutputStream xzOutputStream = new FileOutputStream("program.parsetree.xz");
+        CompressorOutputStream xzOut = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.XZ, xzOutputStream);
+        ObjectOutputStream xzObjectOutputStream = new ObjectOutputStream(xzOut);
+        xzObjectOutputStream.writeObject(tree);
+        xzObjectOutputStream.close();
+```
+
+and retrieve a compressed parse tree
+```java
+        InputStream inputStream = new FileInputStream("program.parsetree.xz");
+        CompressorInputStream input = new CompressorStreamFactory().createCompressorInputStream(CompressorStreamFactory.XZ, inputStream);
+        ObjectInputStream objectInputStream = new ObjectInputStream(input);
+        ParseTree tree=(ParseTree) objectInputStream.readObject();
+        objectInputStream.close();
+```
+
+
+
 Some background:
 When running several static source code analysis using many different tree visitors and tree walkers, some of the analysis if done in foreground other in background.
 For languages that supports inclusion of source files it is common to have literally 100's of files that all need to be parsed together, with the serialized parse-tree there is just one file to maintain. Alternatively to serializing the parse tree all these files has to be maintained together and recreate the parse tree every time it is needed.
 
 This feature probably make most sense for the use case to support inclusion of source code see [ANTLR fork](https://github.com/HSorensen/antlr4/tree/lexerinclude) or [commit ddf9a331](https://github.com/HSorensen/antlr4/commit/ddf9a3311379870f01122fa1a850c329a5bdca34)
+
+#### Sample serialization with large parse tree
+When reusing a parse tree it can be significant faster to use the serialized parse tree instead of recreating the parse tree from the source code:
+- Creating the parse tree: 31s
+- Compressed parse tree (2.3mb) write 21s / read 2s
+- Uncompressed parse tree (25.6mb) write 88s / read 22s
 
 ### ParseTree.getText( ) with separator
 When using a tree visitor to analyze a parse tree it can be convenient to use getText( ) to see the original source code within a given context. The standard getText( ) method simply returns all the tokens as text but for complicated statements that is not useful.
