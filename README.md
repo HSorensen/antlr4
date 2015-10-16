@@ -86,9 +86,9 @@ When dealing with locating files to include it is quite often necessary to searc
     lex.setLexerScannerIncludeSource(new IncludeScannerSource());
     public class IncludeScannerSource extends LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource {
       @Override
-      public CharStream embedSource(String fName, String substituteFrom, String substituteTo) {
+      public CharStream embedSource(String fName) {
         String fileName = "COBOL/COPYBOOKS/"+fName;
-        return super.embedSource(fileName, substituteFrom, substituteTo);
+        return super.embedSource(fileName);
       }
     }
 ```
@@ -98,10 +98,10 @@ Looking at the richness of the ANTLR implementation it can be daunting to try to
 
 Create a new lexer grammar action `Lexer.performIncludeSourceFile(...)` that will capture the string the lexer has found and will set a flag that a request happened:
 ```java
-    public void performIncludeSourceFile(String fileName)
+    public void performIncludeSourceFile(String lexerText)
     { 
         _hitInclude = true; // instruct scanner to prepare for switch of scan source
-        _includeFileName = fileName;
+        _includeLexerText = lexerText;
     }
 ```
 
@@ -147,7 +147,7 @@ In `Lexer.pushLexerScannerState()` the current state of the relevant lexer attri
                                                                          , getInterpreter().getLine()
                                                                          , getInterpreter().getCharPositionInLine()));
         // open _includeFileName ...
-        this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
+        this._input = _lexerScannerIncludeSource.embedSource(_includeLexerText);
         this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
         this._input.seek(0); // ensure position is set
         getInterpreter().reset();
