@@ -36,10 +36,10 @@ package org.antlr.v4.runtime;
 public interface LexerScannerIncludeSource {
 	
 	/**
-	 * The embedSource method reads the fileName and optionally substitutes text
-	 * before returning the CharStream for the file or returning null in case of errors
+	 * The embedSource method deconstruct the matched lexer string and return a CharStream 
+	 * for the file or returning null in case of errors
 	 */
-	public CharStream embedSource(String fileName, String substituteFrom, String substituteTo);
+	public CharStream embedSource(String lexerText);
 	
 
 }

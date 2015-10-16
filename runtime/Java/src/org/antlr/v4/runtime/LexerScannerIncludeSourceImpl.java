@@ -39,29 +39,21 @@ import java.io.Serializable;
 public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource, Serializable {
 	
 	/**
-	 * The embedSource method reads the fileName and optionally substitutes text
-	 * before returning the CharStream for the file.
-	 * Returns null if an error happended.
+	 * The embedSource method return a CharStream for the fileName.
+	 * Returns null on error.
 	 */
-	public CharStream embedSource(String fileName, String substituteFrom, String substituteTo) {
+	public CharStream embedSource(String lexerText) {
+		String fileName=lexerText;
 		ANTLRInputStream istrm = null;
 		try {
-			istrm = new ANTLRFileStream(fileName);
-			if (substituteFrom != null) {
-				String beforeStream = String.copyValueOf(istrm.data, 0,
-						istrm.size());
-				String replacedStream = beforeStream.replaceAll(substituteFrom,
-						substituteTo);
-				istrm = new ANTLRInputStream(replacedStream);
-				// set filename so it can be found in common token
-				istrm.name=fileName;
-			}
-		} catch (IOException e) {
+			istrm = new ANTLRFileStream(fileName);		
+		} 
+		catch (IOException e) {
 			// TODO: Add error handling
 			e.printStackTrace();
 			istrm=null;
-		}
-
+		} 
+		
 		return istrm;
 	}
 }

@@ -34,7 +34,6 @@ import org.antlr.v4.runtime.misc.IntegerStack;
 import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.misc.Pair;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.EmptyStackException;
@@ -92,20 +91,14 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	public boolean _hitEOF;
 
 	/** 
-	 * Once a request to process an include file, next token need to store 
+	 * Once a request to process an include file, nextToken() need to store 
 	 * current lexer state and read from the requested file.
 	 */
 	public boolean _hitInclude;
 	
-	/** Store fileName for content to be include. */
-	public String _includeFileName;
+	/** Store text for content to be included. */
+	public String _includeLexerText;
 
-	/** Store substitution string for content to be include. */
-	public String _includeSubstFrom;
-	
-	/** Store substitution string for content to be include. */
-	public String _includeSubstTo;
-	
 	/** 
 	 * Keep track of lexerScanner states.
 	 * Needed to handling grammars that allow to include 
@@ -113,6 +106,9 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	 */
 	public final Stack<LexerScannerIncludeStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerIncludeStateStackItem>(); 
 
+	/**
+	 * Default handler for including source code
+	 */
 	public LexerScannerIncludeSource _lexerScannerIncludeSource = new LexerScannerIncludeSourceImpl();
 	
 	/** The channel number for the current token */
@@ -471,17 +467,6 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		_input.consume();
 	}
 	
-	/**
-	 * Prepare Lexer to scan next set of tokens from fileName.
-	 * Stacks current scanner state stack. Once EOF of fileName is met 
-	 * previous scanner state is restored. 
-	 * This method is supposed to be called from a grammar action.
-	 * @param fileName
-	 */
-	public void performIncludeSourceFile(String fileName)
-	{ 
-		performIncludeSourceFile(fileName, null, null);
-	}
 
 	/**
 	 * Prepare Lexer to scan next set of tokens from fileName.
@@ -490,20 +475,16 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	 * A simple string replacement is performed before the scanner reads 
 	 * from the fileName. 
 	 * This method is supposed to be called from a grammar action.
-	 * @param fileName
-	 * @param substFrom
-	 * @param substTo
+	 * @param lexerText
 	 */
-	public void performIncludeSourceFile(String fileName, String substFrom, String substTo)
+	public void performIncludeSourceFile(String lexerText)
 	{ 
 		if (_hitInclude == true) {
 			throw new IllegalStateException("performIncludeSourceFile sequence error.");
 		}
 		
 		_hitInclude = true; // instruct scanner to prepare for switch of scan source
-		_includeFileName = fileName;
-		_includeSubstFrom = substFrom;
-		_includeSubstTo = substTo;
+		_includeLexerText = lexerText;
 	}
 
 
@@ -542,10 +523,10 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 				                                                         , getInterpreter().getCharPositionInLine()));
 		
 			// open _includeFileName ...
-			this._input = _lexerScannerIncludeSource.embedSource(_includeFileName,_includeSubstFrom,_includeSubstTo);
+			this._input = _lexerScannerIncludeSource.embedSource(_includeLexerText);
 			
 			if (this._input==null) {
-				// restore input
+				// An error happened so restore previous input
 				this._input=_lexerScannerStateStack.peek().getInput();
 			  _lexerScannerStateStack.pop();
 			}
