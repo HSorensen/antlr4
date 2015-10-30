@@ -36,6 +36,8 @@ A new lexer grammar action has been defined:
 
 * performIncludeSourceFile
 
+Note: The name is slightly misleading since this will only notify the lexer that a request to include additional source code has been raised. The inclusion will happen once the token and action is complete. Technically the lexer will scan for the next set of tokens from the requested source code inclusion.
+
 Sample lexer grammar:
 
 ```antlr
