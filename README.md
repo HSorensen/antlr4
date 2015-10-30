@@ -12,7 +12,9 @@ This fork is an attempt to solve inclusion of source into the scanning step usin
 - Serializable ParseTree
 - ParseTree.getText( ) with separator
 
+______________________________________
 ### Include Source Support: Background
+
 
 Analyzing grammars for programming languages like **C**, **PL/I** or **COBOL** requires support for handling inclusion of source into the scanning stream. C uses `#include`, PL/I uses `%INCLUDE` and COBOL uses `COPY`.
 ANTLR does not support pulling additional source into its lexer scan directly; but it can be achieved by expanding the source code before invoking ANTLR. This fork is adding new grammar lexer actions to address the inclusion of source code as part of the lexer grammar itself. 
@@ -169,6 +171,7 @@ When `EOF` is met for the new file then `Lexer.popLexerScannerState()` will rest
 
 There are of course other ways to implement the include feature into ANTLR proper. This version works very well for me and let me know if it does or does not work for you.
 
+______________________________________
 ### Serializable Parse Tree
 
 When looking into serializing the ParseTree and only 7 classes needed to implement the Serializable interface:
@@ -235,6 +238,7 @@ When reusing a parse tree it can be significant faster to use the serialized par
 - Compressed parse tree (2.3mb) write 21s / read 2s
 - Uncompressed parse tree (25.6mb) write 88s / read 22s
 
+______________________________________
 ### ParseTree.getText( ) with separator
 When using a tree visitor to analyze a parse tree it can be convenient to use getText( ) to see the original source code within a given context. The standard getText( ) method simply returns all the tokens as text but for complicated statements that is not useful.
 
