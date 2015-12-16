@@ -40,6 +40,8 @@ public interface LexerScannerIncludeSource {
 	 * for the file or returning null in case of errors
 	 */
 	public CharStream embedSource(String lexerText);
+
+	public default CharStream embedSource(String currentName, int line, String lexerText) { return embedSource(lexerText);}
 	
 
 }

@@ -56,4 +56,5 @@ public class LexerScannerIncludeSourceImpl implements LexerScannerIncludeSource,
 		
 		return istrm;
 	}
+
 }
