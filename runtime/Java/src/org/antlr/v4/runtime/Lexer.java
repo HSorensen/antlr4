@@ -523,7 +523,10 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 				                                                         , getInterpreter().getCharPositionInLine()));
 		
 			// open _includeFileName ...
-			this._input = _lexerScannerIncludeSource.embedSource(_input.getSourceName(),getInterpreter().getLine(),_includeLexerText);  //track lineno?
+			this._input = _lexerScannerIncludeSource.embedSource(_input.getSourceName()
+					,_tokenStartLine // getInterpreter().getLine()
+                    ,_tokenStartCharIndex
+					,_includeLexerText);  //track lineno?
 			
 			if (this._input==null) {
 				// An error happened so restore previous input

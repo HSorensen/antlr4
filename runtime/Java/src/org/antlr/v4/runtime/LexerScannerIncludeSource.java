@@ -41,7 +41,7 @@ public interface LexerScannerIncludeSource {
 	 */
 	public CharStream embedSource(String lexerText);
 
-	public default CharStream embedSource(String currentName, int line, String lexerText) { return embedSource(lexerText);}
+	public default CharStream embedSource(String currentName, int line, int offset, String lexerText) { return embedSource(lexerText);}
 	
 
 }
