@@ -1,36 +1,15 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.semantics;
 
+import org.antlr.runtime.tree.CommonTree;
+import org.antlr.v4.automata.LexerATNFactory;
 import org.antlr.v4.parse.ANTLRParser;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.tool.Alternative;
 import org.antlr.v4.tool.Attribute;
 import org.antlr.v4.tool.AttributeDict;
@@ -38,9 +17,14 @@ import org.antlr.v4.tool.ErrorManager;
 import org.antlr.v4.tool.ErrorType;
 import org.antlr.v4.tool.Grammar;
 import org.antlr.v4.tool.LabelElementPair;
+import org.antlr.v4.tool.LabelType;
+import org.antlr.v4.tool.LeftRecursiveRule;
+import org.antlr.v4.tool.LexerGrammar;
 import org.antlr.v4.tool.Rule;
+import org.antlr.v4.tool.ast.AltAST;
 import org.antlr.v4.tool.ast.GrammarAST;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -67,7 +51,7 @@ public class SymbolChecks {
 
 	protected final Set<String> reservedNames = new HashSet<String>();
 	{
-		reservedNames.add("EOF");
+		reservedNames.addAll(LexerATNFactory.getCommonConstants());
 	}
 
     public SymbolChecks(Grammar g, SymbolCollector collector) {
@@ -91,10 +75,10 @@ public class SymbolChecks {
     }
 
     public void process() {
-        // methods affect fields, but no side-effects outside this object
+		// methods affect fields, but no side-effects outside this object
 		// So, call order sensitive
 		// First collect all rules for later use in checkForLabelConflict()
-		if ( g.rules!=null ) {
+		if (g.rules != null) {
 			for (Rule r : g.rules.values()) nameToRuleMap.put(r.name, r);
 		}
 		checkReservedNames(g.rules.values());
@@ -104,41 +88,41 @@ public class SymbolChecks {
 	}
 
 	public void checkActionRedefinitions(List<GrammarAST> actions) {
-		if ( actions==null ) return;
+		if (actions == null) return;
 		String scope = g.getDefaultActionScope();
 		String name;
 		GrammarAST nameNode;
 		for (GrammarAST ampersandAST : actions) {
-			nameNode = (GrammarAST)ampersandAST.getChild(0);
-			if ( ampersandAST.getChildCount()==2 ) {
+			nameNode = (GrammarAST) ampersandAST.getChild(0);
+			if (ampersandAST.getChildCount() == 2) {
 				name = nameNode.getText();
 			}
 			else {
 				scope = nameNode.getText();
-                name = ampersandAST.getChild(1).getText();
-            }
-            Set<String> scopeActions = actionScopeToActionNames.get(scope);
-            if ( scopeActions==null ) { // init scope
-                scopeActions = new HashSet<String>();
-                actionScopeToActionNames.put(scope, scopeActions);
-            }
-            if ( !scopeActions.contains(name) ) {
-                scopeActions.add(name);
-            }
-            else {
-                errMgr.grammarError(ErrorType.ACTION_REDEFINITION,
-                                          g.fileName, nameNode.token, name);
-            }
-        }
-    }
+				name = ampersandAST.getChild(1).getText();
+			}
+			Set<String> scopeActions = actionScopeToActionNames.get(scope);
+			if (scopeActions == null) { // init scope
+				scopeActions = new HashSet<String>();
+				actionScopeToActionNames.put(scope, scopeActions);
+			}
+			if (!scopeActions.contains(name)) {
+				scopeActions.add(name);
+			}
+			else {
+				errMgr.grammarError(ErrorType.ACTION_REDEFINITION,
+						g.fileName, nameNode.token, name);
+			}
+		}
+	}
 
-    public void checkForTokenConflicts(List<GrammarAST> tokenIDRefs) {
+	public void checkForTokenConflicts(List<GrammarAST> tokenIDRefs) {
 //        for (GrammarAST a : tokenIDRefs) {
 //            Token t = a.token;
 //            String ID = t.getText();
 //            tokenIDs.add(ID);
 //        }
-    }
+	}
 
     /** Make sure a label doesn't conflict with another symbol.
      *  Labels must not conflict with: rules, tokens, scope names,
@@ -147,43 +131,114 @@ public class SymbolChecks {
      *  for repeated defs.
      */
     public void checkForLabelConflicts(Collection<Rule> rules) {
-        for (Rule r : rules) {
-            checkForAttributeConflicts(r);
-            Map<String, LabelElementPair> labelNameSpace =
-                new HashMap<String, LabelElementPair>();
-            for (int i=1; i<=r.numberOfAlts; i++) {
-				if (r.hasAltSpecificContexts()) {
-					labelNameSpace.clear();
+		for (Rule r : rules) {
+			checkForAttributeConflicts(r);
+
+			Map<String, LabelElementPair> labelNameSpace = new HashMap<>();
+			for (int i = 1; i <= r.numberOfAlts; i++) {
+				Alternative a = r.alt[i];
+				for (List<LabelElementPair> pairs : a.labelDefs.values()) {
+					if (r.hasAltSpecificContexts()) {
+						// Collect labelName-labeledRules map for rule with alternative labels.
+						Map<String, List<LabelElementPair>> labelPairs = new HashMap<>();
+						for (LabelElementPair p : pairs) {
+							String labelName = findAltLabelName(p.label);
+							if (labelName != null) {
+								List<LabelElementPair> list;
+								if (labelPairs.containsKey(labelName)) {
+									list = labelPairs.get(labelName);
+								}
+								else {
+									list = new ArrayList<>();
+									labelPairs.put(labelName, list);
+								}
+								list.add(p);
+							}
+						}
+
+						for (List<LabelElementPair> internalPairs : labelPairs.values()) {
+							labelNameSpace.clear();
+							checkLabelPairs(r, labelNameSpace, internalPairs);
+						}
+					}
+					else {
+						checkLabelPairs(r, labelNameSpace, pairs);
+					}
 				}
+			}
+		}
+	}
 
-                Alternative a = r.alt[i];
-                for (List<LabelElementPair> pairs : a.labelDefs.values() ) {
-                    for (LabelElementPair p : pairs) {
-                        checkForLabelConflict(r, p.label);
-                        String name = p.label.getText();
-                        LabelElementPair prev = labelNameSpace.get(name);
-                        if ( prev==null ) labelNameSpace.put(name, p);
-                        else checkForTypeMismatch(prev, p);
-                    }
-                }
-            }
-        }
-    }
+	private void checkLabelPairs(Rule r, Map<String, LabelElementPair> labelNameSpace, List<LabelElementPair> pairs) {
+		for (LabelElementPair p : pairs) {
+			checkForLabelConflict(r, p.label);
+			String name = p.label.getText();
+			LabelElementPair prev = labelNameSpace.get(name);
+			if (prev == null) {
+				labelNameSpace.put(name, p);
+			}
+			else {
+				checkForTypeMismatch(r, prev, p);
+			}
+		}
+	}
 
-    void checkForTypeMismatch(LabelElementPair prevLabelPair,
-                                        LabelElementPair labelPair)
-    {
-        // label already defined; if same type, no problem
-        if ( prevLabelPair.type != labelPair.type ) {
-            String typeMismatchExpr = labelPair.type+"!="+prevLabelPair.type;
-            errMgr.grammarError(
-                ErrorType.LABEL_TYPE_CONFLICT,
-                g.fileName,
-                labelPair.label.token,
-                labelPair.label.getText(),
-                typeMismatchExpr);
-        }
-    }
+	private String findAltLabelName(CommonTree label) {
+		if (label == null) {
+			return null;
+		}
+		else if (label instanceof AltAST) {
+			AltAST altAST = (AltAST) label;
+			if (altAST.altLabel != null) {
+				return altAST.altLabel.toString();
+			}
+			else if (altAST.leftRecursiveAltInfo != null) {
+				return altAST.leftRecursiveAltInfo.altLabel.toString();
+			}
+			else {
+				return findAltLabelName(label.parent);
+			}
+		}
+		else {
+			return findAltLabelName(label.parent);
+		}
+	}
+
+	private void checkForTypeMismatch(Rule r, LabelElementPair prevLabelPair, LabelElementPair labelPair) {
+		// label already defined; if same type, no problem
+		if (prevLabelPair.type != labelPair.type) {
+			// Current behavior: take a token of rule declaration in case of left-recursive rule
+			// Desired behavior: take a token of proper label declaration in case of left-recursive rule
+			// See https://github.com/antlr/antlr4/pull/1585
+			// Such behavior is referring to the fact that the warning is typically reported on the actual label redefinition,
+			//   but for left-recursive rules the warning is reported on the enclosing rule.
+			org.antlr.runtime.Token token = r instanceof LeftRecursiveRule
+					?  ((GrammarAST) r.ast.getChild(0)).getToken()
+					: labelPair.label.token;
+			errMgr.grammarError(
+					ErrorType.LABEL_TYPE_CONFLICT,
+					g.fileName,
+					token,
+					labelPair.label.getText(),
+					labelPair.type + "!=" + prevLabelPair.type);
+		}
+		if (!prevLabelPair.element.getText().equals(labelPair.element.getText()) &&
+			(prevLabelPair.type.equals(LabelType.RULE_LABEL) || prevLabelPair.type.equals(LabelType.RULE_LIST_LABEL)) &&
+			(labelPair.type.equals(LabelType.RULE_LABEL) || labelPair.type.equals(LabelType.RULE_LIST_LABEL))) {
+
+			org.antlr.runtime.Token token = r instanceof LeftRecursiveRule
+					?  ((GrammarAST) r.ast.getChild(0)).getToken()
+					: labelPair.label.token;
+			String prevLabelOp = prevLabelPair.type.equals(LabelType.RULE_LIST_LABEL) ? "+=" : "=";
+			String labelOp = labelPair.type.equals(LabelType.RULE_LIST_LABEL) ? "+=" : "=";
+			errMgr.grammarError(
+					ErrorType.LABEL_TYPE_CONFLICT,
+					g.fileName,
+					token,
+					labelPair.label.getText() + labelOp + labelPair.element.getText(),
+					prevLabelPair.label.getText() + prevLabelOp + prevLabelPair.element.getText());
+		}
+	}
 
 	public void checkForLabelConflict(Rule r, GrammarAST labelID) {
 		String name = labelID.getText();
@@ -265,6 +320,23 @@ public class SymbolChecks {
 		for (Rule rule : rules) {
 			if (reservedNames.contains(rule.name)) {
 				errMgr.grammarError(ErrorType.RESERVED_RULE_NAME, g.fileName, ((GrammarAST)rule.ast.getChild(0)).getToken(), rule.name);
+			}
+		}
+	}
+
+	public void checkForModeConflicts(Grammar g) {
+		if (g.isLexer()) {
+			LexerGrammar lexerGrammar = (LexerGrammar)g;
+			for (String modeName : lexerGrammar.modes.keySet()) {
+				if (!modeName.equals("DEFAULT_MODE") && reservedNames.contains(modeName)) {
+					Rule rule = lexerGrammar.modes.get(modeName).iterator().next();
+					g.tool.errMgr.grammarError(ErrorType.MODE_CONFLICTS_WITH_COMMON_CONSTANTS, g.fileName, rule.ast.parent.getToken(), modeName);
+				}
+
+				if (g.getTokenType(modeName) != Token.INVALID_TYPE) {
+					Rule rule = lexerGrammar.modes.get(modeName).iterator().next();
+					g.tool.errMgr.grammarError(ErrorType.MODE_CONFLICTS_WITH_TOKEN, g.fileName, rule.ast.parent.getToken(), modeName);
+				}
 			}
 		}
 	}

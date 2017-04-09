@@ -1,32 +1,9 @@
 #
-# [The "BSD license"]
-#  Copyright (c) 2012 Terence Parr
-#  Copyright (c) 2012 Sam Harwell
-#  Copyright (c) 2014 Eric Vergnaud
-#  All rights reserved.
-#
-#  Redistribution and use in source and binary forms, with or without
-#  modification, are permitted provided that the following conditions
-#  are met:
-#
-#  1. Redistributions of source code must retain the above copyright
-#     notice, self list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright
-#     notice, self list of conditions and the following disclaimer in the
-#     documentation and/or other materials provided with the distribution.
-#  3. The name of the author may not be used to endorse or promote products
-#     derived from self software without specific prior written permission.
-#
-#  self SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-#  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-#  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-#  self SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+# Use of this file is governed by the BSD 3-clause license that
+# can be found in the LICENSE.txt file in the project root.
+import sys
+from typing.io import TextIO
 from antlr4.BufferedTokenStream import TokenStream
 from antlr4.CommonTokenFactory import TokenFactory
 from antlr4.error.ErrorStrategy import DefaultErrorStrategy
@@ -48,18 +25,18 @@ class TraceListener(ParseTreeListener):
         self._parser = parser
 
     def enterEveryRule(self, ctx):
-        print("enter   " + self._parser.ruleNames[ctx.getRuleIndex()] + ", LT(1)=" + self._parser._input.LT(1).text)
+        print("enter   " + self._parser.ruleNames[ctx.getRuleIndex()] + ", LT(1)=" + self._parser._input.LT(1).text, file=self._parser._output)
 
     def visitTerminal(self, node):
 
-        print("consume " + str(node.symbol) + " rule " + self._parser.ruleNames[self._parser._ctx.getRuleIndex()])
+        print("consume " + str(node.symbol) + " rule " + self._parser.ruleNames[self._parser._ctx.getRuleIndex()], file=self._parser._output)
 
     def visitErrorNode(self, node):
         pass
 
 
     def exitEveryRule(self, ctx):
-        print("exit    " + self._parser.ruleNames[ctx.getRuleIndex()] + ", LT(1)=" + self._parser._input.LT(1).text)
+        print("exit    " + self._parser.ruleNames[ctx.getRuleIndex()] + ", LT(1)=" + self._parser._input.LT(1).text, file=self._parser._output)
 
 
 # self is all the parsing support code essentially; most of it is error recovery stuff.#
@@ -72,10 +49,11 @@ class Parser (Recognizer):
     #
     bypassAltsAtnCache = dict()
 
-    def __init__(self, input:TokenStream):
+    def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
         super().__init__()
         # The input stream.
         self._input = None
+        self._output = output
         # The error handling strategy for the parser. The default value is a new
         # instance of {@link DefaultErrorStrategy}.
         self._errHandler = DefaultErrorStrategy()
@@ -159,7 +137,7 @@ class Parser (Recognizer):
     # @throws RecognitionException if the current input symbol did not match
     # a wildcard and the error strategy could not recover from the mismatched
     # symbol
-    
+
     def matchWildcard(self):
         t = self.getCurrentToken()
         if t.type > 0:
@@ -287,7 +265,7 @@ class Parser (Recognizer):
     def compileParseTreePattern(self, pattern:str, patternRuleIndex:int, lexer:Lexer = None):
         if lexer is None:
             if self.getTokenStream() is not None:
-                tokenSource = self.getTokenStream().getTokenSource()
+                tokenSource = self.getTokenStream().tokenSource
                 if isinstance( tokenSource, Lexer ):
                     lexer = tokenSource
         if lexer is None:
@@ -360,7 +338,10 @@ class Parser (Recognizer):
                 node = self._ctx.addTokenNode(o)
             if hasListener:
                 for listener in self._parseListeners:
-                    listener.visitTerminal(node)
+                    if isinstance(node, ErrorNode):
+                        listener.visitErrorNode(node)
+                    elif isinstance(node, TerminalNode):
+                        listener.visitTerminal(node)
         return o
 
     def addContextToParseTree(self):
@@ -371,7 +352,7 @@ class Parser (Recognizer):
     # Always called by generated parsers upon entry to a rule. Access field
     # {@link #_ctx} get the current context.
     #
-    def enterRule(self, localctx:ParserRuleContext , state:int , ruleIndexint ):
+    def enterRule(self, localctx:ParserRuleContext , state:int , ruleIndex:int):
         self.state = state
         self._ctx = localctx
         self._ctx.start = self._input.LT(1)
@@ -389,6 +370,7 @@ class Parser (Recognizer):
         self._ctx = self._ctx.parentCtx
 
     def enterOuterAlt(self, localctx:ParserRuleContext, altNum:int):
+        localctx.setAltNumber(altNum)
         # if we have new localctx, make sure we replace existing ctx
         # that is previous child of parse tree
         if self.buildParseTrees and self._ctx != localctx:
@@ -559,9 +541,9 @@ class Parser (Recognizer):
             dfa = self._interp.decisionToDFA[i]
             if len(dfa.states)>0:
                 if seenOne:
-                    print()
-                print("Decision " + str(dfa.decision) + ":")
-                print(dfa.toString(self.literalNames, self.symbolicNames), end='')
+                    print(file=self._output)
+                print("Decision " + str(dfa.decision) + ":", file=self._output)
+                print(dfa.toString(self.literalNames, self.symbolicNames), end='', file=self._output)
                 seenOne = True
 
 

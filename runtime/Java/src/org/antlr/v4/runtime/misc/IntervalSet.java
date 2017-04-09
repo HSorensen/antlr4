@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 package org.antlr.v4.runtime.misc;
 
@@ -408,30 +384,24 @@ public class IntervalSet implements IntSet {
     @Override
     public boolean contains(int el) {
 		int n = intervals.size();
-		for (int i = 0; i < n; i++) {
-			Interval I = intervals.get(i);
+		int l = 0;
+		int r = n - 1;
+		// Binary search for the element in the (sorted,
+		// disjoint) array of intervals.
+		while (l <= r) {
+			int m = (l + r) / 2;
+			Interval I = intervals.get(m);
 			int a = I.a;
 			int b = I.b;
-			if ( el<a ) {
-				break; // list is sorted and el is before this interval; not here
-			}
-			if ( el>=a && el<=b ) {
-				return true; // found in this interval
+			if ( b<el ) {
+				l = m + 1;
+			} else if ( a>el ) {
+				r = m - 1;
+			} else { // el >= a && el <= b
+				return true;
 			}
 		}
 		return false;
-/*
-		for (ListIterator iter = intervals.listIterator(); iter.hasNext();) {
-            Interval I = (Interval) iter.next();
-            if ( el<I.a ) {
-                break; // list is sorted and el is before this interval; not here
-            }
-            if ( el>=I.a && el<=I.b ) {
-                return true; // found in this interval
-            }
-        }
-        return false;
-        */
     }
 
     /** {@inheritDoc} */
@@ -440,41 +410,29 @@ public class IntervalSet implements IntSet {
         return intervals==null || intervals.isEmpty();
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public int getSingleElement() {
-        if ( intervals!=null && intervals.size()==1 ) {
-            Interval I = intervals.get(0);
-            if ( I.a == I.b ) {
-                return I.a;
-            }
-        }
-        return Token.INVALID_TYPE;
-    }
-
 	/**
-	 * Returns the maximum value contained in the set.
+	 * Returns the maximum value contained in the set if not isNil().
 	 *
-	 * @return the maximum value contained in the set. If the set is empty, this
-	 * method returns {@link Token#INVALID_TYPE}.
+	 * @return the maximum value contained in the set.
+	 * @throws RuntimeException if set is empty
 	 */
 	public int getMaxElement() {
 		if ( isNil() ) {
-			return Token.INVALID_TYPE;
+			throw new RuntimeException("set is empty");
 		}
 		Interval last = intervals.get(intervals.size()-1);
 		return last.b;
 	}
 
 	/**
-	 * Returns the minimum value contained in the set.
+	 * Returns the minimum value contained in the set if not isNil().
 	 *
-	 * @return the minimum value contained in the set. If the set is empty, this
-	 * method returns {@link Token#INVALID_TYPE}.
+	 * @return the minimum value contained in the set.
+	 * @throws RuntimeException if set is empty
 	 */
 	public int getMinElement() {
 		if ( isNil() ) {
-			return Token.INVALID_TYPE;
+			throw new RuntimeException("set is empty");
 		}
 
 		return intervals.get(0).a;
@@ -529,11 +487,11 @@ public class IntervalSet implements IntSet {
 			int b = I.b;
 			if ( a==b ) {
 				if ( a==Token.EOF ) buf.append("<EOF>");
-				else if ( elemAreChar ) buf.append("'").append((char)a).append("'");
+				else if ( elemAreChar ) buf.append("'").appendCodePoint(a).append("'");
 				else buf.append(a);
 			}
 			else {
-				if ( elemAreChar ) buf.append("'").append((char)a).append("'..'").append((char)b).append("'");
+				if ( elemAreChar ) buf.append("'").appendCodePoint(a).append("'..'").appendCodePoint(b).append("'");
 				else buf.append(a).append("..").append(b);
 			}
 			if ( iter.hasNext() ) {

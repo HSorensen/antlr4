@@ -1,48 +1,30 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.test.tool;
 
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNSerializer;
-import org.antlr.v4.test.runtime.java.BaseTest;
 import org.antlr.v4.tool.DOTGenerator;
 import org.antlr.v4.tool.Grammar;
 import org.antlr.v4.tool.LexerGrammar;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 
-public class TestATNSerialization extends BaseTest {
+public class TestATNSerialization extends BaseJavaToolTest {
+	@Before
+	@Override
+	public void testSetUp() throws Exception {
+		super.testSetUp();
+	}
+
 	@Test public void testSimpleNoBlock() throws Exception {
 		Grammar g = new Grammar(
 			"parser grammar T;\n"+
@@ -127,7 +109,6 @@ public class TestATNSerialization extends BaseTest {
 			"3->1 EPSILON 0,0,0\n";
 		ATN atn = createATN(g, true);
 		DOTGenerator gen = new DOTGenerator(g);
-		System.out.println(gen.getDOT(atn.ruleToStartState[0]));
 		String result = ATNSerializer.getDecoded(atn, Arrays.asList(g.getTokenNames()));
 		assertEquals(expecting, result);
 	}
@@ -304,6 +285,113 @@ public class TestATNSerialization extends BaseTest {
 			"6->2 EPSILON 0,0,0\n" +
 			"7->8 ATOM 98,0,0\n" +
 			"8->4 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeSMPLiteralSerializedToSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"INT : '\\u{1F4A9}' ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:128169..128169\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeSMPRangeSerializedToSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"INT : ('a'..'\\u{1F4A9}') ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'a'..128169\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeSMPSetSerializedAfterBMPSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"SMP : ('\\u{1F4A9}' | '\\u{1F4AF}') ;\n"+
+			"BMP : ('a' | 'x') ;");
+		String expecting =
+			"max type 2\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:RULE_START 1\n" +
+			"4:RULE_STOP 1\n" +
+			"5:BASIC 0\n" +
+			"6:BASIC 0\n" +
+			"7:BASIC 1\n" +
+			"8:BASIC 1\n" +
+			"rule 0:1 1\n" +
+			"rule 1:3 2\n" +
+			"mode 0:0\n" +
+			"0:'a'..'a', 'x'..'x'\n" +
+			"1:128169..128169, 128175..128175\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"0->3 EPSILON 0,0,0\n" +
+			"1->5 EPSILON 0,0,0\n" +
+			"3->7 EPSILON 0,0,0\n" +
+			"5->6 SET 1,0,0\n" +
+			"6->2 EPSILON 0,0,0\n" +
+			"7->8 SET 0,0,0\n" +
+			"8->4 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerNotLiteral() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"INT : ~'a' ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'a'..'a'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
 			"0:0\n";
 		ATN atn = createATN(lg, true);
 		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
@@ -537,6 +625,222 @@ public class TestATNSerialization extends BaseTest {
 		assertEquals(expecting, result);
 	}
 
+	@Test public void testLexerUnicodeUnescapedBMPNotSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\u4E9C'|'\u4E9D')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u4E9C'..'\\u4E9D'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeUnescapedBMPSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\u4E9C'|'\u4E9D'|'\u6C5F'|'\u305F'..'\u307B')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u305F'..'\\u307B', '\\u4E9C'..'\\u4E9D', '\\u6C5F'..'\\u6C5F'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeUnescapedBMPNotSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\u4E9C'|'\u4E9D'|'\u6C5F'|'\u305F'..'\u307B')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u305F'..'\\u307B', '\\u4E9C'..'\\u4E9D', '\\u6C5F'..'\\u6C5F'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedBMPNotSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u4E9C'|'\\u4E9D')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u4E9C'..'\\u4E9D'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedBMPSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\\u4E9C'|'\\u4E9D'|'\\u6C5F'|'\\u305F'..'\\u307B')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u305F'..'\\u307B', '\\u4E9C'..'\\u4E9D', '\\u6C5F'..'\\u6C5F'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedBMPNotSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u4E9C'|'\\u4E9D'|'\\u6C5F'|'\\u305F'..'\\u307B')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:'\\u305F'..'\\u307B', '\\u4E9C'..'\\u4E9D', '\\u6C5F'..'\\u6C5F'\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedSMPNotSet() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u{1F4A9}'|'\\u{1F4AA}')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:128169..128170\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedSMPSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\\u{1F4A9}'|'\\u{1F4AA}'|'\\u{1F441}'|'\\u{1D40F}'..'\\u{1D413}')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:119823..119827, 128065..128065, 128169..128170\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
+	@Test public void testLexerUnicodeEscapedSMPNotSetWithRange() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u{1F4A9}'|'\\u{1F4AA}'|'\\u{1F441}'|'\\u{1D40F}'..'\\u{1D413}')\n ;");
+		String expecting =
+			"max type 1\n" +
+			"0:TOKEN_START -1\n" +
+			"1:RULE_START 0\n" +
+			"2:RULE_STOP 0\n" +
+			"3:BASIC 0\n" +
+			"4:BASIC 0\n" +
+			"rule 0:1 1\n" +
+			"mode 0:0\n" +
+			"0:119823..119827, 128065..128065, 128169..128170\n" +
+			"0->1 EPSILON 0,0,0\n" +
+			"1->3 EPSILON 0,0,0\n" +
+			"3->4 NOT_SET 0,0,0\n" +
+			"4->2 EPSILON 0,0,0\n" +
+			"0:0\n";
+		ATN atn = createATN(lg, true);
+		String result = ATNSerializer.getDecoded(atn, Arrays.asList(lg.getTokenNames()));
+		assertEquals(expecting, result);
+	}
+
 	@Test public void testLexerWildcardWithMode() throws Exception {
 		LexerGrammar lg = new LexerGrammar(
 			"lexer grammar L;\n"+
@@ -632,7 +936,7 @@ public class TestATNSerialization extends BaseTest {
 			"lexer grammar L;\n"+
 			"A : 'a'\n ;\n" +
 			"B : 'b';\n" +
-			"mode A;\n" +
+			"mode M;\n" +
 			"C : 'c';\n"+
 			"D : 'd';\n");
 		String expecting =

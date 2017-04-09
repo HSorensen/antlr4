@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.tool;
@@ -101,9 +77,11 @@ public class Grammar implements AttributeResolver {
 	public static final Set<String> parserOptions = new HashSet<String>();
 	static {
 		parserOptions.add("superClass");
+		parserOptions.add("contextSuperClass");
 		parserOptions.add("TokenLabelType");
 		parserOptions.add("tokenVocab");
 		parserOptions.add("language");
+		parserOptions.add("exportMacro");
 	}
 
 	public static final Set<String> lexerOptions = parserOptions;
@@ -114,14 +92,14 @@ public class Grammar implements AttributeResolver {
 
 	public static final Set<String> LexerBlockOptions = new HashSet<String>();
 
-	/** Legal options for rule refs like id<key=value> */
+	/** Legal options for rule refs like id&lt;key=value&gt; */
 	public static final Set<String> ruleRefOptions = new HashSet<String>();
 	static {
 		ruleRefOptions.add(LeftRecursiveRuleTransformer.PRECEDENCE_OPTION_NAME);
 		ruleRefOptions.add(LeftRecursiveRuleTransformer.TOKENINDEX_OPTION_NAME);
 	}
 
-	/** Legal options for terminal refs like ID<assoc=right> */
+	/** Legal options for terminal refs like ID&lt;assoc=right&gt; */
 	public static final Set<String> tokenOptions = new HashSet<String>();
 	static {
 		tokenOptions.add("assoc");
@@ -337,6 +315,15 @@ public class Grammar implements AttributeResolver {
         this.text = grammarText;
 		this.fileName = fileName;
 		this.tool = new Tool();
+		ANTLRToolListener hush = new ANTLRToolListener() {
+			@Override
+			public void info(String msg) { }
+			@Override
+			public void error(ANTLRMessage msg) { }
+			@Override
+			public void warning(ANTLRMessage msg) { }
+		};
+		tool.addListener(hush); // we want to hush errors/warnings
 		this.tool.addListener(listener);
 		org.antlr.runtime.ANTLRStringStream in = new org.antlr.runtime.ANTLRStringStream(grammarText);
 		in.name = fileName;
@@ -382,6 +369,8 @@ public class Grammar implements AttributeResolver {
 		if ( ast==null ) return;
         GrammarAST i = (GrammarAST)ast.getFirstChildWithType(ANTLRParser.IMPORT);
         if ( i==null ) return;
+	    Set<String> visited = new HashSet<>();
+	    visited.add(this.name);
         importedGrammars = new ArrayList<Grammar>();
         for (Object c : i.getChildren()) {
             GrammarAST t = (GrammarAST)c;
@@ -392,6 +381,9 @@ public class Grammar implements AttributeResolver {
             }
             else if ( t.getType()==ANTLRParser.ID ) {
                 importedGrammarName = t.getText();
+			}
+			if ( visited.contains(importedGrammarName) ) { // ignore circular refs
+				continue;
 			}
 			Grammar g;
 			try {
@@ -552,15 +544,6 @@ public class Grammar implements AttributeResolver {
 	}
 
     public List<Grammar> getImportedGrammars() { return importedGrammars; }
-
-    /** Get delegates below direct delegates of g
-    public List<Grammar> getIndirectDelegates(Grammar g) {
-        List<Grammar> direct = getDirectDelegates(g);
-        List<Grammar> delegates = getDelegates(g);
-        delegates.removeAll(direct);
-        return delegates;
-    }
-*/
 
 	public LexerGrammar getImplicitLexer() {
 		return implicitLexer;
@@ -1318,7 +1301,11 @@ public class Grammar implements AttributeResolver {
 
 		char[] serializedAtn = ATNSerializer.getSerializedAsChars(atn);
 		ATN deserialized = new ATNDeserializer().deserialize(serializedAtn);
-		return new LexerInterpreter(fileName, getVocabulary(), Arrays.asList(getRuleNames()), ((LexerGrammar)this).modes.keySet(), deserialized, input);
+		List<String> allChannels = new ArrayList<String>();
+		allChannels.add("DEFAULT_TOKEN_CHANNEL");
+		allChannels.add("HIDDEN");
+		allChannels.addAll(channelValueToNameList);
+		return new LexerInterpreter(fileName, getVocabulary(), Arrays.asList(getRuleNames()), allChannels, ((LexerGrammar)this).modes.keySet(), deserialized, input);
 	}
 
 	/** @since 4.5.1 */

@@ -62,7 +62,16 @@
 //      anchor element as parser in that case. Thes breaks web worker support,
 //      but we don't care since these browsers also don't support web workers.
 
-    var parser = URL ? new URL(location.href) : document.createElement('A');
+    var parser = (function() {
+        try {
+            return new URL(location.href);
+        } catch(e) {
+            var p = Object.create(location);
+            // need to set writable, because WorkerLocation is read-only
+            Object.defineProperty(p, "href", {writable:true});
+            return p;
+        }
+    })();
 
 // INFO Module cache
 //      Contains getter functions for the exports objects of all the loaded
@@ -81,7 +90,7 @@
         delete cache.foo;
     }
     catch (e) {
-        console.warn("Honey: falling back to DOM workaround for defineProperty ("+e+")");
+        console.warn("Honey: falling back to DOM workaround for cache object ("+e+")");
         cache = document.createElement('DIV');
     }
 

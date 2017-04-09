@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2013 Terence Parr
- *  Copyright (c) 2013 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.runtime.atn;
@@ -69,6 +45,12 @@ public class ATNDeserializer {
 	 */
 	private static final UUID ADDED_LEXER_ACTIONS;
 	/**
+	 * This UUID indicates the serialized ATN contains two sets of
+	 * IntervalSets, where the second set's values are encoded as
+	 * 32-bit integers to support the full Unicode SMP range up to U+10FFFF.
+	 */
+	private static final UUID ADDED_UNICODE_SMP;
+	/**
 	 * This list contains all of the currently supported UUIDs, ordered by when
 	 * the feature first appeared in this branch.
 	 */
@@ -85,15 +67,59 @@ public class ATNDeserializer {
 		BASE_SERIALIZED_UUID = UUID.fromString("33761B2D-78BB-4A43-8B0B-4F5BEE8AACF3");
 		ADDED_PRECEDENCE_TRANSITIONS = UUID.fromString("1DA0C57D-6C06-438A-9B27-10BCB3CE0F61");
 		ADDED_LEXER_ACTIONS = UUID.fromString("AADB8D7E-AEEF-4415-AD2B-8204D6CF042E");
+		ADDED_UNICODE_SMP = UUID.fromString("59627784-3BE5-417A-B9EB-8131A7286089");
 
 		SUPPORTED_UUIDS = new ArrayList<UUID>();
 		SUPPORTED_UUIDS.add(BASE_SERIALIZED_UUID);
 		SUPPORTED_UUIDS.add(ADDED_PRECEDENCE_TRANSITIONS);
 		SUPPORTED_UUIDS.add(ADDED_LEXER_ACTIONS);
+		SUPPORTED_UUIDS.add(ADDED_UNICODE_SMP);
 
-		SERIALIZED_UUID = ADDED_LEXER_ACTIONS;
+		SERIALIZED_UUID = ADDED_UNICODE_SMP;
 	}
 
+	interface UnicodeDeserializer {
+		// Wrapper for readInt() or readInt32()
+		int readUnicode(char[] data, int p);
+
+		// Work around Java not allowing mutation of captured variables
+		// by returning amount by which to increment p after each read
+		int size();
+	}
+
+	enum UnicodeDeserializingMode {
+		UNICODE_BMP,
+		UNICODE_SMP
+	}
+
+	static UnicodeDeserializer getUnicodeDeserializer(UnicodeDeserializingMode mode) {
+		if (mode == UnicodeDeserializingMode.UNICODE_BMP) {
+			return new UnicodeDeserializer() {
+				@Override
+				public int readUnicode(char[] data, int p) {
+					return toInt(data[p]);
+				}
+
+				@Override
+				public int size() {
+					return 1;
+				}
+			};
+		}
+		else {
+			return new UnicodeDeserializer() {
+				@Override
+				public int readUnicode(char[] data, int p) {
+					return toInt32(data, p);
+				}
+
+				@Override
+				public int size() {
+					return 2;
+				}
+			};
+		}
+	}
 
 	private final ATNDeserializationOptions deserializationOptions;
 
@@ -122,7 +148,7 @@ public class ATNDeserializer {
 	 * serialized ATN at or after the feature identified by {@code feature} was
 	 * introduced; otherwise, {@code false}.
 	 */
-	protected boolean isFeatureSupported(UUID feature, UUID actualUuid) {
+	static protected boolean isFeatureSupported(UUID feature, UUID actualUuid) {
 		int featureIndex = SUPPORTED_UUIDS.indexOf(feature);
 		if (featureIndex < 0) {
 			return false;
@@ -134,7 +160,22 @@ public class ATNDeserializer {
 	@SuppressWarnings("deprecation")
 	public ATN deserialize(char[] data) {
 		data = data.clone();
-		// don't adjust the first value since that's the version number
+
+		// Each char value in data is shifted by +2 at the entry to this method.
+		// This is an encoding optimization targeting the serialized values 0
+		// and -1 (serialized to 0xFFFF), each of which are very common in the
+		// serialized form of the ATN. In the modified UTF-8 that Java uses for
+		// compiled string literals, these two character values have multi-byte
+		// forms. By shifting each value by +2, they become characters 2 and 1
+		// prior to writing the string, each of which have single-byte
+		// representations. Since the shift occurs in the tool during ATN
+		// serialization, each target is responsible for adjusting the values
+		// during deserialization.
+		//
+		// As a special case, note that the first element of data is not
+		// adjusted because it contains the major version number of the
+		// serialized ATN, which was fixed at 3 at the time the value shifting
+		// was implemented.
 		for (int i = 1; i < data.length; i++) {
 			data[i] = (char)(data[i] - 2);
 		}
@@ -267,22 +308,14 @@ public class ATNDeserializer {
 		// SETS
 		//
 		List<IntervalSet> sets = new ArrayList<IntervalSet>();
-		int nsets = toInt(data[p++]);
-		for (int i=0; i<nsets; i++) {
-			int nintervals = toInt(data[p]);
-			p++;
-			IntervalSet set = new IntervalSet();
-			sets.add(set);
 
-			boolean containsEof = toInt(data[p++]) != 0;
-			if (containsEof) {
-				set.add(-1);
-			}
+		// First, read all sets with 16-bit Unicode code points <= U+FFFF.
+		p = deserializeSets(data, p, sets, getUnicodeDeserializer(UnicodeDeserializingMode.UNICODE_BMP));
 
-			for (int j=0; j<nintervals; j++) {
-				set.add(toInt(data[p]), toInt(data[p + 1]));
-				p += 2;
-			}
+		// Next, if the ATN was serialized with the Unicode SMP feature,
+		// deserialize sets with 32-bit arguments <= U+10FFFF.
+		if (isFeatureSupported(ADDED_UNICODE_SMP, uuid)) {
+			p = deserializeSets(data, p, sets, getUnicodeDeserializer(UnicodeDeserializingMode.UNICODE_SMP));
 		}
 
 		//
@@ -517,6 +550,30 @@ public class ATNDeserializer {
 		}
 
 		return atn;
+	}
+
+	private int deserializeSets(char[] data, int p, List<IntervalSet> sets, UnicodeDeserializer unicodeDeserializer) {
+		int nsets = toInt(data[p++]);
+		for (int i=0; i<nsets; i++) {
+			int nintervals = toInt(data[p]);
+			p++;
+			IntervalSet set = new IntervalSet();
+			sets.add(set);
+
+			boolean containsEof = toInt(data[p++]) != 0;
+			if (containsEof) {
+				set.add(-1);
+			}
+
+			for (int j=0; j<nintervals; j++) {
+				int a = unicodeDeserializer.readUnicode(data, p);
+				p += unicodeDeserializer.size();
+				int b = unicodeDeserializer.readUnicode(data, p);
+				p += unicodeDeserializer.size();
+				set.add(a, b);
+			}
+		}
+		return p;
 	}
 
 	/**

@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.runtime;
@@ -36,12 +12,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /** Do not buffer up the entire char stream. It does keep a small buffer
  *  for efficiency and also buffers while a mark exists (set by the
  *  lookahead prediction in parser). "Unbuffered" here refers to fact
  *  that it doesn't buffer all data, not that's it's on demand loading of char.
+ *
+ *  Before 4.7, this class used the default environment encoding to convert
+ *  bytes to UTF-16, and held the UTF-16 bytes in the buffer as chars.
+ *
+ *  As of 4.7, the class uses UTF-8 by default, and the buffer holds Unicode
+ *  code points in the buffer as ints.
  */
 public class UnbufferedCharStream implements CharStream {
 	/**
@@ -49,7 +33,7 @@ public class UnbufferedCharStream implements CharStream {
 	 * we keep adding to buffer. Otherwise, {@link #consume consume()} resets so
 	 * we start filling at index 0 again.
 	 */
-   	protected char[] data;
+	protected int[] data;
 
 	/**
 	 * The number of characters currently in {@link #data data}.
@@ -106,7 +90,7 @@ public class UnbufferedCharStream implements CharStream {
 	/** Useful for subclasses that pull char from other than this.input. */
 	public UnbufferedCharStream(int bufferSize) {
 		n = 0;
-		data = new char[bufferSize];
+		data = new int[bufferSize];
 	}
 
 	public UnbufferedCharStream(InputStream input) {
@@ -118,8 +102,12 @@ public class UnbufferedCharStream implements CharStream {
 	}
 
 	public UnbufferedCharStream(InputStream input, int bufferSize) {
+		this(input, bufferSize, StandardCharsets.UTF_8);
+	}
+
+	public UnbufferedCharStream(InputStream input, int bufferSize, Charset charset) {
 		this(bufferSize);
-		this.input = new InputStreamReader(input);
+		this.input = new InputStreamReader(input, charset);
 		fill(1); // prime
 	}
 
@@ -169,13 +157,42 @@ public class UnbufferedCharStream implements CharStream {
 	 */
 	protected int fill(int n) {
 		for (int i=0; i<n; i++) {
-			if (this.n > 0 && data[this.n - 1] == (char)IntStream.EOF) {
+			if (this.n > 0 && data[this.n - 1] == IntStream.EOF) {
 				return i;
 			}
 
 			try {
 				int c = nextChar();
-				add(c);
+				if (c > Character.MAX_VALUE || c == IntStream.EOF) {
+					add(c);
+				}
+				else {
+					char ch = (char) c;
+					if (Character.isLowSurrogate(ch)) {
+						throw new RuntimeException("Invalid UTF-16 (low surrogate with no preceding high surrogate)");
+					}
+					else if (Character.isHighSurrogate(ch)) {
+						int lowSurrogate = nextChar();
+						if (lowSurrogate > Character.MAX_VALUE) {
+							throw new RuntimeException("Invalid UTF-16 (high surrogate followed by code point > U+FFFF");
+						}
+						else if (lowSurrogate == IntStream.EOF) {
+							throw new RuntimeException("Invalid UTF-16 (dangling high surrogate at end of file)");
+						}
+						else {
+							char lowSurrogateChar = (char) lowSurrogate;
+							if (Character.isLowSurrogate(lowSurrogateChar)) {
+								add(Character.toCodePoint(ch, lowSurrogateChar));
+							}
+							else {
+								throw new RuntimeException("Invalid UTF-16 (dangling high surrogate");
+							}
+						}
+					}
+					else {
+						add(c);
+					}
+				}
 			}
 			catch (IOException ioe) {
 				throw new RuntimeException(ioe);
@@ -197,7 +214,7 @@ public class UnbufferedCharStream implements CharStream {
 		if ( n>=data.length ) {
 			data = Arrays.copyOf(data, data.length * 2);
         }
-        data[n++] = (char)c;
+        data[n++] = c;
     }
 
     @Override
@@ -207,9 +224,7 @@ public class UnbufferedCharStream implements CharStream {
         int index = p + i - 1;
         if ( index < 0 ) throw new IndexOutOfBoundsException();
 		if ( index >= n ) return IntStream.EOF;
-        char c = data[index];
-        if ( c==(char)IntStream.EOF ) return IntStream.EOF;
-        return c;
+        return data[index];
     }
 
 	/**
