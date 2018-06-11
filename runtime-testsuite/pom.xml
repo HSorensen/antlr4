@@ -103,6 +103,8 @@
 					<!-- SUREFIRE-951: file.encoding cannot be set via systemPropertyVariables -->
 					<argLine>-Dfile.encoding=UTF-8</argLine>
 					<includes>
+						<include>**/java/Test*.java</include>
+<!--						
 						<include>**/csharp/Test*.java</include>
 						<include>**/java/Test*.java</include>
 						<include>**/go/Test*.java</include>
@@ -110,6 +112,7 @@
 						<include>**/python2/Test*.java</include>
 						<include>**/python3/Test*.java</include>
 						<include>${antlr.tests.swift}</include>
+-->						
 					</includes>
 				</configuration>
 			</plugin>
