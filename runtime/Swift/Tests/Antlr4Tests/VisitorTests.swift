@@ -6,6 +6,14 @@ import XCTest
 import Antlr4
 
 class VisitorTests: XCTestCase {
+    static let allTests = [
+        ("testCalculatorVisitor", testCalculatorVisitor),
+        ("testShouldNotVisitTerminal", testShouldNotVisitTerminal),
+        ("testShouldNotVisitEOF", testShouldNotVisitEOF),
+        ("testVisitErrorNode", testVisitErrorNode),
+        ("testVisitTerminalNode", testVisitTerminalNode)
+    ]
+    
     ///
     /// This test verifies the basic behavior of visitors, with an emphasis on
     /// {@link AbstractParseTreeVisitor#visitTerminal}.
@@ -54,10 +62,10 @@ class VisitorTests: XCTestCase {
 
             var errors = [String]()
 
-            override func syntaxError<T : ATNSimulator>(_ recognizer: Recognizer<T>,
-                                      _ offendingSymbol: AnyObject?,
-                                      _ line: Int, _ charPositionInLine: Int,
-                                      _ msg: String, _ e: AnyObject?) {
+            override func syntaxError<T>(_ recognizer: Recognizer<T>,
+                                         _ offendingSymbol: AnyObject?,
+                                         _ line: Int, _ charPositionInLine: Int,
+                                         _ msg: String, _ e: AnyObject?) {
                 errors.append("line \(line):\(charPositionInLine) \(msg)")
             }
         }

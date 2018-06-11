@@ -13,7 +13,7 @@
 import Foundation
 
 func errPrint(_ msg: String) {
-    fputs(msg + "\n", __stderrp)
+    fputs(msg + "\n", stderr)
 }
 
 public func +(lhs: String, rhs: Int) -> String {
@@ -57,12 +57,6 @@ func >>>(lhs: Int, rhs: Int) -> Int {
     return Int(bitPattern: left >> right)
 }
 
-func synced(_ lock: AnyObject, closure: () -> ()) {
-    objc_sync_enter(lock)
-    closure()
-    objc_sync_exit(lock)
-}
-
 func intChar2String(_ i: Int) -> String {
     return String(Character(integerLiteral: i))
 }
@@ -74,17 +68,6 @@ func log(_ message: String = "", file: String = #file, function: String = #funct
     //   #else
     // do nothing
     //   #endif
-}
-
-func RuntimeException(_ message: String = "", file: String = #file, function: String = #function, lineNum: Int = #line) {
-    // #if DEBUG
-    let info = "FILE: \(URL(fileURLWithPath: file).pathComponents.last!),FUNC: \(function), LINE: \(lineNum) MESSAGE: \(message)"
-    //   #else
-    // let info = "FILE: \(NSURL(fileURLWithPath: file).pathComponents!.last!),FUNC: \(function), LINE: \(lineNum) MESSAGE: \(message)"
-    //   #endif
-
-    fatalError(info)
-
 }
 
 func toInt(_ c: Character) -> Int {

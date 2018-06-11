@@ -9,7 +9,7 @@
 	<parent>
 		<groupId>org.antlr</groupId>
 		<artifactId>antlr4-master</artifactId>
-		<version>4.7.1-SNAPSHOT</version>
+		<version>4.7.2-SNAPSHOT</version>
 		<relativePath>../../pom.xml</relativePath>
 	</parent>
 	<artifactId>antlr4-runtime</artifactId>
@@ -27,6 +27,7 @@
 			<plugin> <!-- create src jar -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
+				<version>3.0.1</version>
 				<executions>
 					<execution>
 						<goals>
@@ -95,6 +96,7 @@
 						<phase>process-classes</phase>
 						<configuration>
 							<instructions>
+								<Automatic-Module-Name>org.antlr.antlr4.runtime</Automatic-Module-Name>
 								<Bundle-SymbolicName>org.antlr.antlr4-runtime</Bundle-SymbolicName>
 							</instructions>
 						</configuration>
