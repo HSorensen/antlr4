@@ -1,31 +1,6 @@
-# [The "BSD license"]
-#  Copyright (c) 2012 Terence Parr
-#  Copyright (c) 2012 Sam Harwell
-#  Copyright (c) 2014 Eric Vergnaud
-#  All rights reserved.
-#
-#  Redistribution and use in source and binary forms, with or without
-#  modification, are permitted provided that the following conditions
-#  are met:
-#
-#  1. Redistributions of source code must retain the above copyright
-#     notice, self list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright
-#     notice, self list of conditions and the following disclaimer in the
-#     documentation and/or other materials provided with the distribution.
-#  3. The name of the author may not be used to endorse or promote products
-#     derived from self software without specific prior written permission.
-#
-#  self SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-#  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-#  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-#  self SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+# Use of this file is governed by the BSD 3-clause license that
+# can be found in the LICENSE.txt file in the project root.
 #/
 
 # A lexer is recognizer that draws input symbols from a character stream.
@@ -34,6 +9,8 @@
 #  of speed.
 #/
 from io import StringIO
+from typing.io import TextIO
+import sys
 from antlr4.CommonTokenFactory import CommonTokenFactory
 from antlr4.atn.LexerATNSimulator import LexerATNSimulator
 from antlr4.InputStream import InputStream
@@ -54,17 +31,18 @@ class Lexer(Recognizer, TokenSource):
 
     DEFAULT_TOKEN_CHANNEL = Token.DEFAULT_CHANNEL
     HIDDEN = Token.HIDDEN_CHANNEL
-    MIN_CHAR_VALUE = '\u0000'
-    MAX_CHAR_VALUE = '\uFFFE'
+    MIN_CHAR_VALUE = 0x0000
+    MAX_CHAR_VALUE = 0x10FFFF
 
-    def __init__(self, input:InputStream):
+    def __init__(self, input:InputStream, output:TextIO = sys.stdout):
         super().__init__()
         self._input = input
+        self._output = output
         self._factory = CommonTokenFactory.DEFAULT
         self._tokenFactorySourcePair = (self, input)
 
         self._interp = None # child classes must populate this
-        
+
         # The goal of all lexer rules/methods is to create a token object.
         #  self is an instance variable as multiple rules may collaborate to
         #  create a single token.  nextToken will return self object after
@@ -187,7 +165,7 @@ class Lexer(Recognizer, TokenSource):
 
     def pushMode(self, m:int):
         if self._interp.debug:
-            print("pushMode " + str(m))
+            print("pushMode " + str(m), file=self._output)
         self._modeStack.append(self._mode)
         self.mode(m)
 
@@ -195,7 +173,7 @@ class Lexer(Recognizer, TokenSource):
         if len(self._modeStack)==0:
             raise Exception("Empty Stack")
         if self._interp.debug:
-            print("popMode back to "+ self._modeStack[:-1])
+            print("popMode back to "+ self._modeStack[:-1], file=self._output)
         self.mode( self._modeStack.pop() )
         return self._mode
 

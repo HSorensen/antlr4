@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.codegen;
@@ -33,6 +9,7 @@ package org.antlr.v4.codegen;
 import org.antlr.v4.Tool;
 import org.antlr.v4.codegen.model.RuleFunction;
 import org.antlr.v4.codegen.model.SerializedATN;
+import org.antlr.v4.misc.CharSupport;
 import org.antlr.v4.misc.Utils;
 import org.antlr.v4.parse.ANTLRParser;
 import org.antlr.v4.runtime.RuntimeMetaData;
@@ -56,7 +33,7 @@ public abstract class Target {
 	 *  predicates and such that may refer to chars that need to be escaped
 	 *  when represented as strings.  Also, templates need to be escaped so
 	 *  that the target language can hold them as a string.
-	 *  <p/>
+	 *  <p>
 	 *  I have defined (via the constructor) the set of typical escapes,
 	 *  but your {@link Target} subclass is free to alter the translated chars
 	 *  or add more definitions.  This is non-static so each target can have
@@ -64,7 +41,7 @@ public abstract class Target {
 	 */
 	protected String[] targetCharValueEscape = new String[255];
 
-	private final CodeGenerator gen;
+	protected final CodeGenerator gen;
 	private final String language;
 	private STGroup templates;
 
@@ -99,7 +76,6 @@ public abstract class Target {
 	 */
 	public abstract String getVersion();
 
-
 	public STGroup getTemplates() {
 		if (templates == null) {
 			String version = getVersion();
@@ -114,25 +90,9 @@ public abstract class Target {
 		return templates;
 	}
 
-	protected void genFile(Grammar g,
-						   ST outputFileST,
-						   String fileName)
+	protected void genFile(Grammar g, ST outputFileST, String fileName)
 	{
 		getCodeGenerator().write(outputFileST, fileName);
-	}
-
-	protected void genListenerFile(Grammar g,
-								   ST outputFileST)
-	{
-		String fileName = getCodeGenerator().getListenerFileName();
-		getCodeGenerator().write(outputFileST, fileName);
-	}
-
-	protected void genRecognizerHeaderFile(Grammar g,
-										   ST headerFileST,
-										   String extName) // e.g., ".h"
-	{
-		// no header file by default
 	}
 
 	/** Get a meaningful name for a token type useful during code generation.
@@ -187,23 +147,34 @@ public abstract class Target {
 		if ( quoted ) {
 			buf.append('"');
 		}
-		for (int i=0; i<s.length(); i++) {
-			int c = s.charAt(i);
+		for (int i=0; i<s.length(); ) {
+			int c = s.codePointAt(i);
 			if ( c!='\'' && // don't escape single quotes in strings for java
 				 c<targetCharValueEscape.length &&
 				 targetCharValueEscape[c]!=null )
 			{
 				buf.append(targetCharValueEscape[c]);
 			}
-			else {
-				buf.append((char)c);
+			else if (shouldUseUnicodeEscapeForCodePointInDoubleQuotedString(c)) {
+				appendUnicodeEscapedCodePoint(i, buf);
 			}
+			else
+			{
+				buf.appendCodePoint(c);
+			}
+			i += Character.charCount(c);
 		}
 		if ( quoted ) {
 			buf.append('"');
 		}
 		return buf.toString();
 	}
+
+	/**
+	 * Escape the Unicode code point appropriately for this language
+	 * and append the escaped value to {@code sb}.
+	 */
+	abstract protected void appendUnicodeEscapedCodePoint(int codePoint, StringBuilder sb);
 
 	public String getTargetStringLiteralFromString(String s) {
 		return getTargetStringLiteralFromString(s, true);
@@ -235,18 +206,21 @@ public abstract class Target {
 
 		if ( addQuotes ) sb.append('"');
 
-		for (int i = 1; i < is.length() -1; i++) {
-			if  (is.charAt(i) == '\\') {
+		for (int i = 1; i < is.length() -1; ) {
+			int codePoint = is.codePointAt(i);
+			int toAdvance = Character.charCount(codePoint);
+			if  (codePoint == '\\') {
 				// Anything escaped is what it is! We assume that
 				// people know how to escape characters correctly. However
 				// we catch anything that does not need an escape in Java (which
 				// is what the default implementation is dealing with and remove
 				// the escape. The C target does this for instance.
 				//
-				switch (is.charAt(i+1)) {
+				int escapedCodePoint = is.codePointAt(i+toAdvance);
+				toAdvance++;
+				switch (escapedCodePoint) {
 					// Pass through any escapes that Java also needs
 					//
-					case    '"':
 					case    'n':
 					case    'r':
 					case    't':
@@ -255,37 +229,68 @@ public abstract class Target {
 					case    '\\':
 						// Pass the escape through
 						sb.append('\\');
+						sb.appendCodePoint(escapedCodePoint);
 						break;
 
-					case    'u':    // Assume unnnn
-						// Pass the escape through as double \\
-						// so that Java leaves as \u0000 string not char
-						sb.append('\\');
-						sb.append('\\');
+					case    'u':    // Either unnnn or u{nnnnnn}
+						if (is.charAt(i+toAdvance) == '{') {
+							while (is.charAt(i+toAdvance) != '}') {
+								toAdvance++;
+							}
+							toAdvance++;
+						}
+						else {
+							toAdvance += 4;
+						}
+						if ( i+toAdvance <= is.length() ) { // we might have an invalid \\uAB or something
+							String fullEscape = is.substring(i, i+toAdvance);
+							appendUnicodeEscapedCodePoint(
+								CharSupport.getCharValueFromCharInGrammarLiteral(fullEscape),
+								sb);
+						}
 						break;
-
 					default:
-						// Remove the escape by virtue of not adding it here
-						// Thus \' becomes ' and so on
+						if (shouldUseUnicodeEscapeForCodePointInDoubleQuotedString(escapedCodePoint)) {
+							appendUnicodeEscapedCodePoint(escapedCodePoint, sb);
+						}
+						else {
+							sb.appendCodePoint(escapedCodePoint);
+						}
 						break;
-				}
-
-				// Go past the \ character
-				i++;
-			} else {
-				// Characters that don't need \ in ANTLR 'strings' but do in Java
-				if (is.charAt(i) == '"') {
-					// We need to escape " in Java
-					sb.append('\\');
 				}
 			}
-			// Add in the next character, which may have been escaped
-			sb.append(is.charAt(i));
+			else {
+				if (codePoint == 0x22) {
+					// ANTLR doesn't escape " in literal strings,
+					// but every other language needs to do so.
+					sb.append("\\\"");
+				}
+				else if (shouldUseUnicodeEscapeForCodePointInDoubleQuotedString(codePoint)) {
+					appendUnicodeEscapedCodePoint(codePoint, sb);
+				}
+				else {
+					sb.appendCodePoint(codePoint);
+				}
+			}
+			i += toAdvance;
 		}
 
 		if ( addQuotes ) sb.append('"');
 
 		return sb.toString();
+	}
+
+	private static boolean shouldUseUnicodeEscapeForCodePointInDoubleQuotedString(int codePoint) {
+		// We don't want anyone passing 0x0A (newline) or 0x22
+		// (double-quote) here because Java treats \\u000A as
+		// a literal newline and \\u0022 as a literal
+		// double-quote, so Unicode escaping doesn't help.
+		assert codePoint != 0x0A && codePoint != 0x22;
+
+		return
+			codePoint < 0x20  || // control characters up to but not including space
+			codePoint == 0x5C || // backslash
+			codePoint >= 0x7F;   // DEL and beyond (keeps source code 7-bit US-ASCII)
 	}
 
 	/** Assume 16-bit char */
@@ -390,6 +395,55 @@ public abstract class Target {
 		int ttype = getCodeGenerator().g.getTokenType(name);
 		if ( ttype==Token.INVALID_TYPE ) return name;
 		return getTokenTypeAsTargetLabel(getCodeGenerator().g, ttype);
+	}
+
+	/** Generate TParser.java and TLexer.java from T.g4 if combined, else
+	 *  just use T.java as output regardless of type.
+	 */
+	public String getRecognizerFileName(boolean header) {
+		ST extST = getTemplates().getInstanceOf("codeFileExtension");
+		String recognizerName = gen.g.getRecognizerName();
+		return recognizerName+extST.render();
+	}
+
+	/** A given grammar T, return the listener name such as
+	 *  TListener.java, if we're using the Java target.
+ 	 */
+	public String getListenerFileName(boolean header) {
+		assert gen.g.name != null;
+		ST extST = getTemplates().getInstanceOf("codeFileExtension");
+		String listenerName = gen.g.name + "Listener";
+		return listenerName+extST.render();
+	}
+
+	/** A given grammar T, return the visitor name such as
+	 *  TVisitor.java, if we're using the Java target.
+ 	 */
+	public String getVisitorFileName(boolean header) {
+		assert gen.g.name != null;
+		ST extST = getTemplates().getInstanceOf("codeFileExtension");
+		String listenerName = gen.g.name + "Visitor";
+		return listenerName+extST.render();
+	}
+
+	/** A given grammar T, return a blank listener implementation
+	 *  such as TBaseListener.java, if we're using the Java target.
+ 	 */
+	public String getBaseListenerFileName(boolean header) {
+		assert gen.g.name != null;
+		ST extST = getTemplates().getInstanceOf("codeFileExtension");
+		String listenerName = gen.g.name + "BaseListener";
+		return listenerName+extST.render();
+	}
+
+	/** A given grammar T, return a blank listener implementation
+	 *  such as TBaseListener.java, if we're using the Java target.
+ 	 */
+	public String getBaseVisitorFileName(boolean header) {
+		assert gen.g.name != null;
+		ST extST = getTemplates().getInstanceOf("codeFileExtension");
+		String listenerName = gen.g.name + "BaseVisitor";
+		return listenerName+extST.render();
 	}
 
 	/**
@@ -524,4 +578,7 @@ public abstract class Target {
 	public boolean supportsOverloadedMethods() {
 		return true;
 	}
+
+	/** @since 4.6 */
+	public boolean needsHeader() { return false; }; // Override in targets that need header files.
 }

@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.tool;
@@ -40,7 +16,6 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.Locale;
 import java.util.Set;
 
 public class ErrorManager {
@@ -56,8 +31,6 @@ public class ErrorManager {
     /** The group of templates that represent the current message format. */
     STGroup format;
 
-    /** Messages should be sensitive to the locale. */
-    Locale locale;
     String formatName;
 
     ErrorBuffer initSTListener = new ErrorBuffer();
@@ -87,11 +60,20 @@ public class ErrorManager {
 			locationValid = true;
 		}
 		if (msg.fileName != null) {
-			File f = new File(msg.fileName);
-			// Don't show path to file in messages; too long.
 			String displayFileName = msg.fileName;
-			if ( f.exists() ) {
-				displayFileName = f.getName();
+			if (format.equals("antlr")) {
+				// Don't show path to file in messages in ANTLR format;
+				// they're too long.
+				File f = new File(msg.fileName);
+				if ( f.exists() ) {
+					displayFileName = f.getName();
+				}
+			}
+			else {
+				// For other message formats, use the full filename in the
+				// message.  This assumes that these formats are intended to
+				// be parsed by IDEs, and so they need the full path to
+				// resolve correctly.
 			}
 			locationST.add("file", displayFileName);
 			locationValid = true;
@@ -157,7 +139,7 @@ public class ErrorManager {
     }
 
     /**
-     * Raise a predefined message with some number of paramters for the StringTemplate but for which there
+     * Raise a predefined message with some number of parameters for the StringTemplate but for which there
      * is no location information possible.
      * @param errorType The Message Descriptor
      * @param args The arguments to pass to the StringTemplate

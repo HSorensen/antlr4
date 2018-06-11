@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.gui;
@@ -61,7 +37,10 @@ import java.awt.geom.CubicCurve2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -183,7 +162,8 @@ public class TreeViewer extends JComponent {
 					double ctrly2 = y1;
 					c.setCurve(x1, y1, ctrlx1, ctrly1, ctrlx2, ctrly2, x2, y2);
 					((Graphics2D) g).draw(c);
-				} else {
+				}
+				else {
 					g.drawLine((int) x1, (int) y1,
 							   (int) x2, (int) y2);
 				}
@@ -268,6 +248,69 @@ public class TreeViewer extends JComponent {
 		}
 	}
 
+	protected void generateEdges(Writer writer, Tree parent) throws IOException {
+		if (!getTree().isLeaf(parent)) {
+			Rectangle2D.Double b1 = getBoundsOfNode(parent);
+			double x1 = b1.getCenterX();
+			double y1 = b1.getCenterY();
+
+			for (Tree child : getTree().getChildren(parent)) {
+				Rectangle2D.Double childBounds = getBoundsOfNode(child);
+				double x2 = childBounds.getCenterX();
+				double y2 = childBounds.getMinY();
+				writer.write(line(""+x1, ""+y1, ""+x2, ""+y2,
+					"stroke:black; stroke-width:1px;"));
+				generateEdges(writer, child);
+			}
+		}
+	}
+
+	protected void generateBox(Writer writer, Tree parent) throws IOException {
+
+		// draw the box in the background
+		Rectangle2D.Double box = getBoundsOfNode(parent);
+		writer.write(rect(""+box.x, ""+box.y, ""+box.width, ""+box.height,
+			"fill:orange; stroke:rgb(0,0,0);", "rx=\"1\""));
+
+		// draw the text on top of the box (possibly multiple lines)
+		String line = getText(parent).replace("<","&lt;").replace(">","&gt;");
+		int fontSize = 10;
+		int x = (int) box.x + 2;
+		int y = (int) box.y + fontSize - 1;
+		String style = String.format("font-family:sans-serif;font-size:%dpx;",
+			fontSize);
+		writer.write(text(""+x, ""+y, style, line));
+	}
+
+	private static String line(String x1, String y1, String x2, String y2,
+		String style) {
+		return String
+			.format("<line x1=\"%s\" y1=\"%s\" x2=\"%s\" y2=\"%s\" style=\"%s\" />\n",
+				x1, y1, x2, y2, style);
+	}
+
+	private static String rect(String x, String y, String width, String height,
+		String style, String extraAttributes) {
+		return String
+			.format("<rect x=\"%s\" y=\"%s\" width=\"%s\" height=\"%s\" style=\"%s\" %s/>\n",
+				x, y, width, height, style, extraAttributes);
+	}
+
+	private static String text(String x, String y, String style, String text) {
+		return String.format(
+			"<text x=\"%s\" y=\"%s\" style=\"%s\">\n%s\n</text>\n", x, y,
+			style, text);
+	}
+
+	private void paintSVG(Writer writer) throws IOException {
+
+		generateEdges(writer, getTree().getRoot());
+
+		for (Tree tree : treeLayout.getNodeBounds().keySet()) {
+			generateBox(writer, tree);
+		}
+	}
+
 	@Override
 	protected Graphics getComponentGraphics(Graphics g) {
 		Graphics2D g2d=(Graphics2D)g;
@@ -285,8 +328,8 @@ public class TreeViewer extends JComponent {
     private static final String DIALOG_DIVIDER_LOC_PREFS_KEY    = "dialog_divider_location";
     private static final String DIALOG_VIEWER_SCALE_PREFS_KEY   = "dialog_viewer_scale";
 
-	protected static JDialog showInDialog(final TreeViewer viewer) {
-		final JDialog dialog = new JDialog();
+	protected static JFrame showInDialog(final TreeViewer viewer) {
+		final JFrame dialog = new JFrame();
 		dialog.setTitle("Parse Tree Inspector");
 
         final Preferences prefs = Preferences.userNodeForPackage(TreeViewer.class);
@@ -330,6 +373,18 @@ public class TreeViewer extends JComponent {
 		);
 		wrapper.add(png);
 
+		// Add an export-to-png button right of the "OK" button
+		JButton svg = new JButton("Export as SVG");
+		svg.addActionListener(
+			new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				generateSVGFile(viewer, dialog);
+			}
+		}
+		);
+		wrapper.add(svg);
+
 		bottomPanel.add(wrapper, BorderLayout.SOUTH);
 
 		// Add scale slider
@@ -372,11 +427,11 @@ public class TreeViewer extends JComponent {
 
 				JTree selectedTree = (JTree) e.getSource();
 				TreePath path = selectedTree.getSelectionPath();
-				if(path!=null) {
-				    TreeNodeWrapper treeNode = (TreeNodeWrapper) path.getLastPathComponent();
+				if (path!=null) {
+					TreeNodeWrapper treeNode = (TreeNodeWrapper) path.getLastPathComponent();
 
-				    // Set the clicked AST.
-				    viewer.setTree((Tree) treeNode.getUserObject());
+					// Set the clicked AST.
+					viewer.setTree((Tree) treeNode.getUserObject());
 				}
 			}
 		});
@@ -393,6 +448,7 @@ public class TreeViewer extends JComponent {
 
 		// make viz
         WindowListener exitListener = new WindowAdapter() {
+	        @Override
             public void windowClosing(WindowEvent e) {
                 prefs.putInt(DIALOG_WIDTH_PREFS_KEY, (int) dialog.getSize().getWidth());
                 prefs.putInt(DIALOG_HEIGHT_PREFS_KEY, (int) dialog.getSize().getHeight());
@@ -431,7 +487,7 @@ public class TreeViewer extends JComponent {
 		return dialog;
 	}
 
-	private static void generatePNGFile(TreeViewer viewer, JDialog dialog) {
+	private static void generatePNGFile(TreeViewer viewer, JFrame dialog) {
 		BufferedImage bi = new BufferedImage(viewer.getSize().width,
 											 viewer.getSize().height,
 											 BufferedImage.TYPE_INT_ARGB);
@@ -440,29 +496,7 @@ public class TreeViewer extends JComponent {
 		g.dispose();
 
 		try {
-			File suggestedFile = generateNonExistingPngFile();
-			JFileChooser fileChooser = new JFileChooserConfirmOverwrite();
-			fileChooser.setCurrentDirectory(suggestedFile.getParentFile());
-			fileChooser.setSelectedFile(suggestedFile);
-			FileFilter pngFilter = new FileFilter() {
-
-				@Override
-				public boolean accept(File pathname) {
-					if (pathname.isFile()) {
-						return pathname.getName().toLowerCase().endsWith(".png");
-					}
-
-					return true;
-				}
-
-				@Override
-				public String getDescription() {
-					return "PNG Files (*.png)";
-				}
-			};
-
-			fileChooser.addChoosableFileFilter(pngFilter);
-			fileChooser.setFileFilter(pngFilter);
+			JFileChooser fileChooser = getFileChooser(".png", "PNG files");
 
 			int returnValue = fileChooser.showSaveDialog(dialog);
 			if (returnValue == JFileChooser.APPROVE_OPTION) {
@@ -491,23 +525,85 @@ public class TreeViewer extends JComponent {
 		}
 	}
 
-	private static File generateNonExistingPngFile() {
+	private static JFileChooser getFileChooser(final String fileEnding,
+												final String description) {
+		File suggestedFile = generateNonExistingFile(fileEnding);
+		JFileChooser fileChooser = new JFileChooserConfirmOverwrite();
+		fileChooser.setCurrentDirectory(suggestedFile.getParentFile());
+		fileChooser.setSelectedFile(suggestedFile);
+		FileFilter filter = new FileFilter() {
+
+			@Override
+			public boolean accept(File pathname) {
+				if (pathname.isFile()) {
+					return pathname.getName().toLowerCase().endsWith(fileEnding);
+				}
+
+				return true;
+			}
+
+			@Override
+			public String getDescription() {
+				return description+" (*"+fileEnding+")";
+			}
+		};
+		fileChooser.addChoosableFileFilter(filter);
+		fileChooser.setFileFilter(filter);
+		return fileChooser;
+	}
+
+	private static void generateSVGFile(TreeViewer viewer, JFrame dialog) {
+
+		try {
+			JFileChooser fileChooser = getFileChooser(".svg", "SVG files");
+
+			int returnValue = fileChooser.showSaveDialog(dialog);
+			if (returnValue == JFileChooser.APPROVE_OPTION) {
+				File svgFile = fileChooser.getSelectedFile();
+				// save the new svg file here!
+				BufferedWriter writer = new BufferedWriter(new FileWriter(svgFile));
+				// HACK: multiplying with 1.1 should be replaced wit an accurate number
+				writer.write("<svg width=\"" + viewer.getSize().getWidth() * 1.1 + "\" height=\"" + viewer.getSize().getHeight() * 1.1 + "\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">");
+				viewer.paintSVG(writer);
+				writer.write("</svg>");
+				writer.flush();
+				writer.close();
+				try {
+					// Try to open the parent folder using the OS' native file manager.
+					Desktop.getDesktop().open(svgFile.getParentFile());
+				} catch (Exception ex) {
+					// We could not launch the file manager: just show a popup that we
+					// succeeded in saving the PNG file.
+					JOptionPane.showMessageDialog(dialog, "Saved SVG to: "
+						+ svgFile.getAbsolutePath());
+					ex.printStackTrace();
+				}
+			}
+		} catch (Exception ex) {
+			JOptionPane.showMessageDialog(dialog,
+				"Could not export to SVG: " + ex.getMessage(),
+				"Error",
+				JOptionPane.ERROR_MESSAGE);
+			ex.printStackTrace();
+		}
+	}
+
+	private static File generateNonExistingFile(String extension) {
 
 		final String parent = ".";
 		final String name = "antlr4_parse_tree";
-		final String extension = ".png";
 
-		File pngFile = new File(parent, name + extension);
+		File file = new File(parent, name + extension);
 
 		int counter = 1;
 
 		// Keep looping until we create a File that does not yet exist.
-		while (pngFile.exists()) {
-			pngFile = new File(parent, name + "_"+ counter + extension);
+		while (file.exists()) {
+			file = new File(parent, name + "_" + counter + extension);
 			counter++;
 		}
 
-		return pngFile;
+		return file;
 	}
 
 	private static void fillTree(TreeNodeWrapper node, Tree tree, TreeViewer viewer) {
@@ -536,14 +632,14 @@ public class TreeViewer extends JComponent {
 	}
 
 
-	public Future<JDialog> open() {
+	public Future<JFrame> open() {
 		final TreeViewer viewer = this;
 		viewer.setScale(1.5);
-		Callable<JDialog> callable = new Callable<JDialog>() {
-			JDialog result;
+		Callable<JFrame> callable = new Callable<JFrame>() {
+			JFrame result;
 
 			@Override
-			public JDialog call() throws Exception {
+			public JFrame call() throws Exception {
 				SwingUtilities.invokeAndWait(new Runnable() {
 					@Override
 					public void run() {
@@ -566,7 +662,7 @@ public class TreeViewer extends JComponent {
 	}
 
 	public void save(String fileName) throws IOException, PrintException {
-		JDialog dialog = new JDialog();
+		JFrame dialog = new JFrame();
 		Container contentPane = dialog.getContentPane();
 		((JComponent) contentPane).setBorder(BorderFactory.createEmptyBorder(
 				10, 10, 10, 10));

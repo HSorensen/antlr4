@@ -1,32 +1,7 @@
 #
-# [The "BSD license"]
-#  Copyright (c) 2012 Terence Parr
-#  Copyright (c) 2012 Sam Harwell
-#  Copyright (c) 2014 Eric Vergnaud
-#  All rights reserved.
-#
-#  Redistribution and use in source and binary forms, with or without
-#  modification, are permitted provided that the following conditions
-#  are met:
-#
-#  1. Redistributions of source code must retain the above copyright
-#     notice, this list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright
-#     notice, this list of conditions and the following disclaimer in the
-#     documentation and/or other materials provided with the distribution.
-#  3. The name of the author may not be used to endorse or promote products
-#     derived from this software without specific prior written permission.
-#
-#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-#  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-#  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-#  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+# Use of this file is governed by the BSD 3-clause license that
+# can be found in the LICENSE.txt file in the project root.
 
 #
 # Specialized {@link Set}{@code <}{@link ATNConfig}{@code >} that can track
@@ -34,6 +9,7 @@
 # graph-structured stack.
 #/
 from io import StringIO
+from functools import reduce
 from antlr4.PredictionContext import PredictionContext, merge
 from antlr4.Utils import str_list
 from antlr4.atn.ATN import ATN
@@ -54,7 +30,7 @@ class ATNConfigSet(object):
     def __init__(self, fullCtx:bool=True):
         # All configs but hashed by (s, i, _, pi) not including context. Wiped out
         # when we go readonly as this set becomes a DFA state.
-        self.configLookup = set()
+        self.configLookup = dict()
         # Indicates that this configuration set is part of a full context
         #  LL prediction. It will be used to determine how to merge $. With SLL
         #  it's a wildcard whereas it is not for LL context merge.
@@ -108,8 +84,8 @@ class ATNConfigSet(object):
         rootIsWildcard = not self.fullCtx
         merged = merge(existing.context, config.context, rootIsWildcard, mergeCache)
         # no need to check for existing.context, config.context in cache
-        # since only way to create new graphs is "call rule" and here. We
-        # cache at both places.
+        # since only way to create new graphs is "call rule" and here.
+        # We cache at both places.
         existing.reachesIntoOuterContext = max(existing.reachesIntoOuterContext, config.reachesIntoOuterContext)
         # make sure to preserve the precedence filter suppression during the merge
         if config.precedenceFilterSuppressed:
@@ -118,24 +94,24 @@ class ATNConfigSet(object):
         return True
 
     def getOrAdd(self, config:ATNConfig):
-        for c in self.configLookup:
-            if c==config:
-                return c
-        self.configLookup.add(config)
+        h = config.hashCodeForConfigSet()
+        l = self.configLookup.get(h, None)
+        if l is not None:
+            r = next((cfg for cfg in l if config.equalsForConfigSet(cfg)), None)
+            if r is not None:
+                return r
+        if l is None:
+            l = [config]
+            self.configLookup[h] = l
+        else:
+            l.append(config)
         return config
 
     def getStates(self):
-        states = set()
-        for c in self.configs:
-            states.add(c.state)
-        return states
+        return set(c.state for c in self.configs)
 
     def getPredicates(self):
-        preds = list()
-        for c in self.configs:
-            if c.semanticContext!=SemanticContext.NONE:
-                preds.append(c.semanticContext)
-        return preds
+        return list(cfg.semanticContext for cfg in self.configs if cfg.semanticContext!=SemanticContext.NONE)
 
     def get(self, i:int):
         return self.configs[i]
@@ -143,7 +119,7 @@ class ATNConfigSet(object):
     def optimizeConfigs(self, interpreter:ATNSimulator):
         if self.readonly:
             raise IllegalStateException("This set is readonly")
-        if len(self.configLookup)==0:
+        if len(self.configs)==0:
             return
         for config in self.configs:
             config.context = interpreter.getCachedContext(config.context)
@@ -177,10 +153,7 @@ class ATNConfigSet(object):
         return self.hashConfigs()
 
     def hashConfigs(self):
-        with StringIO() as buf:
-            for cfg in self.configs:
-                buf.write(str(cfg))
-            return hash(buf.getvalue())
+        return reduce(lambda h, cfg: hash((h, cfg)), self.configs, 0)
 
     def __len__(self):
         return len(self.configs)
@@ -188,16 +161,16 @@ class ATNConfigSet(object):
     def isEmpty(self):
         return len(self.configs)==0
 
-    def __contains__(self, item):
+    def __contains__(self, config):
         if self.configLookup is None:
             raise UnsupportedOperationException("This method is not implemented for readonly sets.")
-        return item in self.configLookup
-
-    def containsFast(self, obj:ATNConfig):
-        if self.configLookup is None:
-            raise UnsupportedOperationException("This method is not implemented for readonly sets.")
-        return self.configLookup.containsFast(obj)
-
+        h = config.hashCodeForConfigSet()
+        l = self.configLookup.get(h, None)
+        if l is not None:
+            for c in l:
+                if config.equalsForConfigSet(c):
+                    return True
+        return False
 
     def clear(self):
         if self.readonly:
@@ -231,7 +204,6 @@ class OrderedATNConfigSet(ATNConfigSet):
 
     def __init__(self):
         super().__init__()
-        # self.configLookup = set()
 
 
 

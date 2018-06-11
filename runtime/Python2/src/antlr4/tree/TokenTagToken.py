@@ -1,32 +1,7 @@
 #
-# [The "BSD license"]
-# Copyright (c) 2013 Terence Parr
-# Copyright (c) 2013 Sam Harwell
-# Copyright (c) 2014 Eric Vergnaud
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#
-# 1. Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-# 3. The name of the author may not be used to endorse or promote products
-#    derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-# OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-# IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-# NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-# THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+# Use of this file is governed by the BSD 3-clause license that
+# can be found in the LICENSE.txt file in the project root.
 #
 
 #
@@ -49,8 +24,8 @@ class TokenTagToken(CommonToken):
     #
     def __init__(self, tokenName, type, label=None):
         super(TokenTagToken, self).__init__(type=type)
-        self.tokenName = tokenName
-        self.label = label
+        self.tokenName = unicode(tokenName)
+        self.label = unicode(label)
         self._text = self.getText()
 
     #
@@ -61,9 +36,9 @@ class TokenTagToken(CommonToken):
     #
     def getText(self):
         if self.label is None:
-            return "<" + self.tokenName + ">"
+            return u"<" + self.tokenName + u">"
         else:
-            return "<" + self.label + ":" + self.tokenName + ">"
+            return u"<" + self.label + u":" + self.tokenName + u">"
 
     # <p>The implementation for {@link TokenTagToken} returns a string of the form
     # {@code tokenName:type}.</p>

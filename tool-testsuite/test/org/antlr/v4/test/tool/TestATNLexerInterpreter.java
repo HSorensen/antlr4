@@ -1,43 +1,19 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.test.tool;
 
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNState;
 import org.antlr.v4.runtime.misc.Utils;
-import org.antlr.v4.test.runtime.java.BaseTest;
 import org.antlr.v4.tool.DOTGenerator;
 import org.antlr.v4.tool.LexerGrammar;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
@@ -57,7 +33,13 @@ import static org.junit.Assert.assertEquals;
  * want, but occasionally there are some quirks as you'll see from
  * the tests below.
  */
-public class TestATNLexerInterpreter extends BaseTest {
+public class TestATNLexerInterpreter extends BaseJavaToolTest {
+	@Before
+	@Override
+	public void testSetUp() throws Exception {
+		super.testSetUp();
+	}
+
 	@Test public void testLexerTwoRules() throws Exception {
 		LexerGrammar lg = new LexerGrammar(
 			"lexer grammar L;\n"+
@@ -137,6 +119,94 @@ public class TestATNLexerInterpreter extends BaseTest {
 			"ID : ~('a'|'b')\n ;");
 		String expecting = "ID, EOF";
 		checkLexerMatches(lg, "c", expecting);
+	}
+
+	@Test public void testLexerSetUnicodeBMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\u611B'|'\u611C')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, "\u611B", expecting);
+	}
+
+	@Test public void testLexerNotSetUnicodeBMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\u611B'|'\u611C')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, "\u611D", expecting);
+	}
+
+		@Test public void testLexerNotSetUnicodeBMPMatchesSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\u611B'|'\u611C')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1F4A9).toString(), expecting);
+	}
+
+	@Test public void testLexerSetUnicodeSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\\u{1F4A9}'|'\\u{1F4AA}')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1F4A9).toString(), expecting);
+	}
+
+	@Test public void testLexerNotBMPSetMatchesUnicodeSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('a'|'b')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1F4A9).toString(), expecting);
+	}
+
+	@Test public void testLexerNotBMPSetMatchesBMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('a'|'b')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, "\u611B", expecting);
+	}
+
+	@Test public void testLexerNotBMPSetMatchesSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('a'|'b')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1F4A9).toString(), expecting);
+	}
+
+	@Test public void testLexerNotSMPSetMatchesBMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u{1F4A9}'|'\\u{1F4AA}')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, "\u611B", expecting);
+	}
+
+	@Test public void testLexerNotSMPSetMatchesSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ~('\\u{1F4A9}'|'\\u{1F4AA}')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1D7C0).toString(), expecting);
+	}
+
+	@Test public void testLexerRangeUnicodeSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\\u{1F4A9}'..'\\u{1F4B0}')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x1F4AF).toString(), expecting);
+	}
+
+	@Test public void testLexerRangeUnicodeBMPToSMP() throws Exception {
+		LexerGrammar lg = new LexerGrammar(
+			"lexer grammar L;\n"+
+			"ID : ('\\u611B'..'\\u{1F4B0}')\n ;");
+		String expecting = "ID, EOF";
+		checkLexerMatches(lg, new StringBuilder().appendCodePoint(0x12001).toString(), expecting);
 	}
 
 	@Test public void testLexerKeywordIDAmbiguity() throws Exception {
@@ -311,15 +381,15 @@ public class TestATNLexerInterpreter extends BaseTest {
 
 	protected void checkLexerMatches(LexerGrammar lg, String inputString, String expecting) {
 		ATN atn = createATN(lg, true);
-		CharStream input = new ANTLRInputStream(inputString);
+		CharStream input = CharStreams.fromString(inputString);
 		ATNState startState = atn.modeNameToStartState.get("DEFAULT_MODE");
 		DOTGenerator dot = new DOTGenerator(lg);
-		System.out.println(dot.getDOT(startState, true));
+//		System.out.println(dot.getDOT(startState, true));
 
 		List<String> tokenTypes = getTokenTypes(lg, atn, input);
 
 		String result = Utils.join(tokenTypes.iterator(), ", ");
-		System.out.println(tokenTypes);
+//		System.out.println(tokenTypes);
 		assertEquals(expecting, result);
 	}
 

@@ -1,31 +1,7 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.automata;
@@ -34,6 +10,7 @@ import org.antlr.runtime.CommonToken;
 import org.antlr.runtime.Token;
 import org.antlr.v4.codegen.CodeGenerator;
 import org.antlr.v4.misc.CharSupport;
+import org.antlr.v4.misc.EscapeSequenceParsing;
 import org.antlr.v4.parse.ANTLRParser;
 import org.antlr.v4.runtime.IntStream;
 import org.antlr.v4.runtime.Lexer;
@@ -41,6 +18,7 @@ import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNState;
 import org.antlr.v4.runtime.atn.ActionTransition;
 import org.antlr.v4.runtime.atn.AtomTransition;
+import org.antlr.v4.runtime.atn.CodePointTransitions;
 import org.antlr.v4.runtime.atn.LexerAction;
 import org.antlr.v4.runtime.atn.LexerChannelAction;
 import org.antlr.v4.runtime.atn.LexerCustomAction;
@@ -51,7 +29,6 @@ import org.antlr.v4.runtime.atn.LexerPushModeAction;
 import org.antlr.v4.runtime.atn.LexerSkipAction;
 import org.antlr.v4.runtime.atn.LexerTypeAction;
 import org.antlr.v4.runtime.atn.NotSetTransition;
-import org.antlr.v4.runtime.atn.RangeTransition;
 import org.antlr.v4.runtime.atn.RuleStartState;
 import org.antlr.v4.runtime.atn.SetTransition;
 import org.antlr.v4.runtime.atn.TokensStartState;
@@ -63,6 +40,7 @@ import org.antlr.v4.tool.LexerGrammar;
 import org.antlr.v4.tool.Rule;
 import org.antlr.v4.tool.ast.ActionAST;
 import org.antlr.v4.tool.ast.GrammarAST;
+import org.antlr.v4.tool.ast.RangeAST;
 import org.antlr.v4.tool.ast.TerminalAST;
 import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
@@ -71,6 +49,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class LexerATNFactory extends ParserATNFactory {
@@ -83,7 +62,7 @@ public class LexerATNFactory extends ParserATNFactory {
 	 * actions, but are required during code generation for creating
 	 * {@link LexerAction} instances that are usable by a lexer interpreter.
 	 */
-	protected static final Map<String, Integer> COMMON_CONSTANTS = new HashMap<String, Integer>();
+	public static final Map<String, Integer> COMMON_CONSTANTS = new HashMap<String, Integer>();
 	static {
 		COMMON_CONSTANTS.put("HIDDEN", Lexer.HIDDEN);
 		COMMON_CONSTANTS.put("DEFAULT_TOKEN_CHANNEL", Lexer.DEFAULT_TOKEN_CHANNEL);
@@ -94,6 +73,8 @@ public class LexerATNFactory extends ParserATNFactory {
 		COMMON_CONSTANTS.put("MAX_CHAR_VALUE", Lexer.MAX_CHAR_VALUE);
 		COMMON_CONSTANTS.put("MIN_CHAR_VALUE", Lexer.MIN_CHAR_VALUE);
 	}
+
+	private List<String> ruleCommands = new ArrayList<String>();
 
 	/**
 	 * Maps from an action index to a {@link LexerAction} object.
@@ -110,6 +91,10 @@ public class LexerATNFactory extends ParserATNFactory {
 		String language = g.getOptionString("language");
 		CodeGenerator gen = new CodeGenerator(g.tool, null, language);
 		codegenTemplates = gen.getTemplates();
+	}
+
+	public static Set<String> getCommonConstants() {
+		return COMMON_CONSTANTS.keySet();
 	}
 
 	@Override
@@ -153,6 +138,12 @@ public class LexerATNFactory extends ParserATNFactory {
 
 		ATNOptimizer.optimize(g, atn);
 		return atn;
+	}
+
+	@Override
+	public Handle rule(GrammarAST ruleAST, String name, Handle blk) {
+		ruleCommands.clear();
+		return super.rule(ruleAST, name, blk);
 	}
 
 	@Override
@@ -231,6 +222,7 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 
 		cmdST.add("arg", arg.getText());
+		cmdST.add("grammar", arg.g);
 		return action(cmdST.render());
 	}
 
@@ -243,8 +235,8 @@ public class LexerATNFactory extends ParserATNFactory {
 
 		// fall back to standard action generation for the command
 		ST cmdST = codegenTemplates.getInstanceOf("Lexer" +
-												  CharSupport.capitalize(ID.getText())+
-												  "Command");
+				CharSupport.capitalize(ID.getText()) +
+				"Command");
 		if (cmdST == null) {
 			g.tool.errMgr.grammarError(ErrorType.INVALID_LEXER_COMMAND, g.fileName, ID.token, ID.getText());
 			return epsilon(ID);
@@ -264,7 +256,8 @@ public class LexerATNFactory extends ParserATNFactory {
 		ATNState right = newState(b);
 		int t1 = CharSupport.getCharValueFromGrammarCharLiteral(a.getText());
 		int t2 = CharSupport.getCharValueFromGrammarCharLiteral(b.getText());
-		left.addTransition(new  RangeTransition(right, t1, t2));
+		checkRange(a, b, t1, t2);
+		left.addTransition(CodePointTransitions.createWithCodePointRange(right, t1, t2));
 		a.atnState = left;
 		b.atnState = left;
 		return new Handle(left, right);
@@ -279,7 +272,10 @@ public class LexerATNFactory extends ParserATNFactory {
 			if ( t.getType()==ANTLRParser.RANGE ) {
 				int a = CharSupport.getCharValueFromGrammarCharLiteral(t.getChild(0).getText());
 				int b = CharSupport.getCharValueFromGrammarCharLiteral(t.getChild(1).getText());
-				set.add(a, b);
+				if (checkRange((GrammarAST) t.getChild(0), (GrammarAST) t.getChild(1), a, b)) {
+					checkSetCollision(associatedAST, set, a, b);
+					set.add(a,b);
+				}
 			}
 			else if ( t.getType()==ANTLRParser.LEXER_CHAR_SET ) {
 				set.addAll(getSetFromCharSetLiteral(t));
@@ -287,12 +283,12 @@ public class LexerATNFactory extends ParserATNFactory {
 			else if ( t.getType()==ANTLRParser.STRING_LITERAL ) {
 				int c = CharSupport.getCharValueFromGrammarCharLiteral(t.getText());
 				if ( c != -1 ) {
+					checkSetCollision(associatedAST, set, c);
 					set.add(c);
 				}
 				else {
 					g.tool.errMgr.grammarError(ErrorType.INVALID_LITERAL_IN_LEXER_SET,
 											   g.fileName, t.getToken(), t.getText());
-
 				}
 			}
 			else if ( t.getType()==ANTLRParser.TOKEN_REF ) {
@@ -307,8 +303,9 @@ public class LexerATNFactory extends ParserATNFactory {
 			Transition transition;
 			if (set.getIntervals().size() == 1) {
 				Interval interval = set.getIntervals().get(0);
-				transition = new RangeTransition(right, interval.a, interval.b);
-			} else {
+				transition = CodePointTransitions.createWithCodePointRange(right, interval.a, interval.b);
+			}
+			else {
 				transition = new SetTransition(right, set);
 			}
 
@@ -318,29 +315,58 @@ public class LexerATNFactory extends ParserATNFactory {
 		return new Handle(left, right);
 	}
 
+	protected boolean checkRange(GrammarAST leftNode, GrammarAST rightNode, int leftValue, int rightValue) {
+		boolean result = true;
+		if (leftValue == -1) {
+			result = false;
+			g.tool.errMgr.grammarError(ErrorType.INVALID_LITERAL_IN_LEXER_SET,
+					g.fileName, leftNode.getToken(), leftNode.getText());
+		}
+		if (rightValue == -1) {
+			result = false;
+			g.tool.errMgr.grammarError(ErrorType.INVALID_LITERAL_IN_LEXER_SET,
+					g.fileName, rightNode.getToken(), rightNode.getText());
+		}
+		if (!result) return result;
+
+		if (rightValue < leftValue) {
+			g.tool.errMgr.grammarError(ErrorType.EMPTY_STRINGS_AND_SETS_NOT_ALLOWED,
+					g.fileName, leftNode.parent.getToken(), leftNode.getText() + ".." + rightNode.getText());
+		}
+		return result;
+	}
+
 	/** For a lexer, a string is a sequence of char to match.  That is,
 	 *  "fog" is treated as 'f' 'o' 'g' not as a single transition in
-	 *  the DFA.  Machine== o-'f'->o-'o'->o-'g'->o and has n+1 states
+	 *  the DFA.  Machine== o-'f'-&gt;o-'o'-&gt;o-'g'-&gt;o and has n+1 states
 	 *  for n characters.
 	 */
 	@Override
 	public Handle stringLiteral(TerminalAST stringLiteralAST) {
 		String chars = stringLiteralAST.getText();
-		chars = CharSupport.getStringFromGrammarStringLiteral(chars);
-		int n = chars.length();
 		ATNState left = newState(stringLiteralAST);
+		ATNState right;
+		String s = CharSupport.getStringFromGrammarStringLiteral(chars);
+		if (s == null) {
+			// the lexer will already have given an error
+			return new Handle(left, left);
+		}
+
+		int n = s.length();
 		ATNState prev = left;
-		ATNState right = null;
-		for (int i=0; i<n; i++) {
+		right = null;
+		for (int i = 0; i < n; ) {
 			right = newState(stringLiteralAST);
-			prev.addTransition(new AtomTransition(right, chars.charAt(i)));
+			int codePoint = s.codePointAt(i);
+			prev.addTransition(CodePointTransitions.createWithCodePoint(right, codePoint));
 			prev = right;
+			i += Character.charCount(codePoint);
 		}
 		stringLiteralAST.atnState = left;
 		return new Handle(left, right);
 	}
 
-	/** [Aa\t \u1234a-z\]\-] char sets */
+	/** [Aa\t \u1234a-z\]\p{Letter}\-] char sets */
 	@Override
 	public Handle charSetLiteral(GrammarAST charSetAST) {
 		ATNState left = newState(charSetAST);
@@ -351,40 +377,230 @@ public class LexerATNFactory extends ParserATNFactory {
 		return new Handle(left, right);
 	}
 
+	private static class CharSetParseState {
+		enum Mode {
+			NONE,
+			ERROR,
+			PREV_CODE_POINT,
+			PREV_PROPERTY
+		}
+
+		public static final CharSetParseState NONE = new CharSetParseState(Mode.NONE, false, -1, IntervalSet.EMPTY_SET);
+		public static final CharSetParseState ERROR = new CharSetParseState(Mode.ERROR, false, -1, IntervalSet.EMPTY_SET);
+
+		public final Mode mode;
+		public final boolean inRange;
+		public final int prevCodePoint;
+		public final IntervalSet prevProperty;
+
+		public CharSetParseState(
+				Mode mode,
+				boolean inRange,
+				int prevCodePoint,
+				IntervalSet prevProperty) {
+			this.mode = mode;
+			this.inRange = inRange;
+			this.prevCodePoint = prevCodePoint;
+			this.prevProperty = prevProperty;
+		}
+
+		@Override
+		public String toString() {
+			return String.format(
+					"%s mode=%s inRange=%s prevCodePoint=%d prevProperty=%s",
+					super.toString(),
+					mode,
+					inRange,
+					prevCodePoint,
+					prevProperty);
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (!(other instanceof CharSetParseState)) {
+				return false;
+			}
+			CharSetParseState that = (CharSetParseState) other;
+			if (this == that) {
+				return true;
+			}
+			return Objects.equals(this.mode, that.mode) &&
+				Objects.equals(this.inRange, that.inRange) &&
+				Objects.equals(this.prevCodePoint, that.prevCodePoint) &&
+				Objects.equals(this.prevProperty, that.prevProperty);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(mode, inRange, prevCodePoint, prevProperty);
+		}
+	}
+
 	public IntervalSet getSetFromCharSetLiteral(GrammarAST charSetAST) {
 		String chars = charSetAST.getText();
-		chars = chars.substring(1, chars.length()-1);
-		String cset = '"'+ chars +'"';
+		chars = chars.substring(1, chars.length() - 1);
 		IntervalSet set = new IntervalSet();
 
-		// unescape all valid escape char like \n, leaving escaped dashes as '\-'
-		// so we can avoid seeing them as '-' range ops.
-		chars = CharSupport.getStringFromGrammarStringLiteral(cset);
-		// now make x-y become set of char
+		if (chars.length() == 0) {
+			g.tool.errMgr.grammarError(ErrorType.EMPTY_STRINGS_AND_SETS_NOT_ALLOWED,
+					g.fileName, charSetAST.getToken(), "[]");
+			return set;
+		}
+
+		CharSetParseState state = CharSetParseState.NONE;
+
 		int n = chars.length();
-		for (int i=0; i< n; i++) {
-			int c = chars.charAt(i);
-			if ( c=='\\' && (i+1)<n && chars.charAt(i+1)=='-' ) { // \-
-				set.add('-');
-				i++;
+		for (int i = 0; i < n; ) {
+			if (state.mode == CharSetParseState.Mode.ERROR) {
+				return new IntervalSet();
 			}
-			else if ( (i+2)<n && chars.charAt(i+1)=='-' ) { // range x-y
-				int x = c;
-				int y = chars.charAt(i+2);
-				if ( x<=y ) set.add(x,y);
-				i+=2;
+			int c = chars.codePointAt(i);
+			int offset = Character.charCount(c);
+			if (c == '\\') {
+				EscapeSequenceParsing.Result escapeParseResult =
+					EscapeSequenceParsing.parseEscape(chars, i);
+				switch (escapeParseResult.type) {
+					case INVALID:
+						String invalid = chars.substring(escapeParseResult.startOffset,
+						                                 escapeParseResult.startOffset+escapeParseResult.parseLength);
+						g.tool.errMgr.grammarError(ErrorType.INVALID_ESCAPE_SEQUENCE,
+						                           g.fileName, charSetAST.getToken(), invalid);
+						state = CharSetParseState.ERROR;
+						break;
+					case CODE_POINT:
+						state = applyPrevStateAndMoveToCodePoint(charSetAST, set, state, escapeParseResult.codePoint);
+						break;
+					case PROPERTY:
+						state = applyPrevStateAndMoveToProperty(charSetAST, set, state, escapeParseResult.propertyIntervalSet);
+						break;
+				}
+				offset = escapeParseResult.parseLength;
+			}
+			else if (c == '-' && !state.inRange && i != 0 && i != n - 1) {
+				if (state.mode == CharSetParseState.Mode.PREV_PROPERTY) {
+					g.tool.errMgr.grammarError(ErrorType.UNICODE_PROPERTY_NOT_ALLOWED_IN_RANGE,
+							g.fileName, charSetAST.getToken(), charSetAST.getText());
+					state = CharSetParseState.ERROR;
+				}
+				else {
+					state = new CharSetParseState(state.mode, true, state.prevCodePoint, state.prevProperty);
+				}
 			}
 			else {
-				set.add(c);
+				state = applyPrevStateAndMoveToCodePoint(charSetAST, set, state, c);
+			}
+			i += offset;
+		}
+		if (state.mode == CharSetParseState.Mode.ERROR) {
+			return new IntervalSet();
+		}
+		// Whether or not we were in a range, we'll add the last code point found to the set.
+		applyPrevState(charSetAST, set, state);
+		return set;
+	}
+
+	private CharSetParseState applyPrevStateAndMoveToCodePoint(
+			GrammarAST charSetAST,
+			IntervalSet set,
+			CharSetParseState state,
+			int codePoint) {
+		if (state.inRange) {
+			if (state.prevCodePoint > codePoint) {
+				g.tool.errMgr.grammarError(
+						ErrorType.EMPTY_STRINGS_AND_SETS_NOT_ALLOWED,
+						g.fileName,
+						charSetAST.getToken(),
+						CharSupport.getRangeEscapedString(state.prevCodePoint, codePoint));
+			}
+			checkSetCollision(charSetAST, set, state.prevCodePoint, codePoint);
+			set.add(state.prevCodePoint, codePoint);
+			state = CharSetParseState.NONE;
+		}
+		else {
+			applyPrevState(charSetAST, set, state);
+			state = new CharSetParseState(
+					CharSetParseState.Mode.PREV_CODE_POINT,
+					false,
+					codePoint,
+					IntervalSet.EMPTY_SET);
+		}
+		return state;
+	}
+
+	private CharSetParseState applyPrevStateAndMoveToProperty(
+			GrammarAST charSetAST,
+			IntervalSet set,
+			CharSetParseState state,
+			IntervalSet property) {
+		if (state.inRange) {
+			g.tool.errMgr.grammarError(ErrorType.UNICODE_PROPERTY_NOT_ALLOWED_IN_RANGE,
+						   g.fileName, charSetAST.getToken(), charSetAST.getText());
+			return CharSetParseState.ERROR;
+		}
+		else {
+			applyPrevState(charSetAST, set, state);
+			state = new CharSetParseState(
+					CharSetParseState.Mode.PREV_PROPERTY,
+					false,
+					-1,
+					property);
+		}
+		return state;
+	}
+
+	private void applyPrevState(GrammarAST charSetAST, IntervalSet set, CharSetParseState state) {
+		switch (state.mode) {
+			case NONE:
+			case ERROR:
+				break;
+			case PREV_CODE_POINT:
+				checkSetCollision(charSetAST, set, state.prevCodePoint);
+				set.add(state.prevCodePoint);
+				break;
+			case PREV_PROPERTY:
+				set.addAll(state.prevProperty);
+				break;
+		}
+	}
+
+	protected void checkSetCollision(GrammarAST ast, IntervalSet set, int el) {
+		checkSetCollision(ast, set, el, el);
+	}
+
+	protected void checkSetCollision(GrammarAST ast, IntervalSet set, int a, int b) {
+		for (int i = a; i <= b; i++) {
+			if (set.contains(i)) {
+				String setText;
+				if (ast.getChildren() == null) {
+					setText = ast.getText();
+				}
+				else {
+					StringBuilder sb = new StringBuilder();
+					for (Object child : ast.getChildren()) {
+						if (child instanceof RangeAST) {
+							sb.append(((RangeAST) child).getChild(0).getText());
+							sb.append("..");
+							sb.append(((RangeAST) child).getChild(1).getText());
+						}
+						else {
+							sb.append(((GrammarAST)child).getText());
+						}
+						sb.append(" | ");
+					}
+					sb.replace(sb.length() - 3, sb.length(), "");
+					setText = sb.toString();
+				}
+				g.tool.errMgr.grammarError(ErrorType.CHARACTERS_COLLISION_IN_SET, g.fileName, ast.getToken(),
+						CharSupport.getRangeEscapedString(a, b), setText);
+				break;
 			}
 		}
-		return set;
 	}
 
 	@Override
 	public Handle tokenRef(TerminalAST node) {
 		// Ref to EOF in lexer yields char transition on -1
-		if ( node.getText().equals("EOF") ) {
+		if (node.getText().equals("EOF") ) {
 			ATNState left = newState(node);
 			ATNState right = newState(node);
 			left.addTransition(new AtomTransition(right, IntStream.EOF));
@@ -393,9 +609,10 @@ public class LexerATNFactory extends ParserATNFactory {
 		return _ruleRef(node);
 	}
 
-
-	protected LexerAction createLexerAction(GrammarAST ID, GrammarAST arg) {
+	private LexerAction createLexerAction(GrammarAST ID, GrammarAST arg) {
 		String command = ID.getText();
+		checkCommands(command, ID.getToken());
+
 		if ("skip".equals(command) && arg == null) {
 			return LexerSkipAction.INSTANCE;
 		}
@@ -407,7 +624,7 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 		else if ("mode".equals(command) && arg != null) {
 			String modeName = arg.getText();
-			Integer mode = getConstantValue(modeName, arg.getToken());
+			Integer mode = getModeConstantValue(modeName, arg.getToken());
 			if (mode == null) {
 				return null;
 			}
@@ -416,7 +633,7 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 		else if ("pushMode".equals(command) && arg != null) {
 			String modeName = arg.getText();
-			Integer mode = getConstantValue(modeName, arg.getToken());
+			Integer mode = getModeConstantValue(modeName, arg.getToken());
 			if (mode == null) {
 				return null;
 			}
@@ -425,7 +642,7 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 		else if ("type".equals(command) && arg != null) {
 			String typeName = arg.getText();
-			Integer type = getConstantValue(typeName, arg.getToken());
+			Integer type = getTokenConstantValue(typeName, arg.getToken());
 			if (type == null) {
 				return null;
 			}
@@ -434,7 +651,7 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 		else if ("channel".equals(command) && arg != null) {
 			String channelName = arg.getText();
-			Integer channel = getConstantValue(channelName, arg.getToken());
+			Integer channel = getChannelConstantValue(channelName, arg.getToken());
 			if (channel == null) {
 				return null;
 			}
@@ -446,37 +663,134 @@ public class LexerATNFactory extends ParserATNFactory {
 		}
 	}
 
+	private void checkCommands(String command, Token commandToken) {
+		// Command combinations list: https://github.com/antlr/antlr4/issues/1388#issuecomment-263344701
+		if (!command.equals("pushMode") && !command.equals("popMode")) {
+			if (ruleCommands.contains(command)) {
+				g.tool.errMgr.grammarError(ErrorType.DUPLICATED_COMMAND, g.fileName, commandToken, command);
+			}
 
-	protected Integer getConstantValue(String name, Token token) {
-		if (name == null) {
+			if (!ruleCommands.equals("mode")) {
+				String firstCommand = null;
+
+				if (command.equals("skip")) {
+					if (ruleCommands.contains("more")) {
+						firstCommand = "more";
+					}
+					else if (ruleCommands.contains("type")) {
+						firstCommand = "type";
+					}
+					else if (ruleCommands.contains("channel")) {
+						firstCommand = "channel";
+					}
+				}
+				else if (command.equals("more")) {
+					if (ruleCommands.contains("skip")) {
+						firstCommand = "skip";
+					}
+					else if (ruleCommands.contains("type")) {
+						firstCommand = "type";
+					}
+					else if (ruleCommands.contains("channel")) {
+						firstCommand = "channel";
+					}
+				}
+				else if (command.equals("type") || command.equals("channel")) {
+					if (ruleCommands.contains("more")) {
+						firstCommand = "more";
+					}
+					else if (ruleCommands.contains("skip")) {
+						firstCommand = "skip";
+					}
+				}
+
+				if (firstCommand != null) {
+					g.tool.errMgr.grammarError(ErrorType.INCOMPATIBLE_COMMANDS, g.fileName, commandToken, firstCommand, command);
+				}
+			}
+		}
+
+		ruleCommands.add(command);
+	}
+
+	private Integer getModeConstantValue(String modeName, Token token) {
+		if (modeName == null) {
 			return null;
 		}
 
-		Integer commonConstant = COMMON_CONSTANTS.get(name);
-		if (commonConstant != null) {
-			return commonConstant;
+		if (modeName.equals("DEFAULT_MODE")) {
+			return Lexer.DEFAULT_MODE;
 		}
-
-		int tokenType = g.getTokenType(name);
-		if (tokenType != org.antlr.v4.runtime.Token.INVALID_TYPE) {
-			return tokenType;
-		}
-
-		int channelValue = g.getChannelValue(name);
-		if (channelValue >= org.antlr.v4.runtime.Token.MIN_USER_CHANNEL_VALUE) {
-			return channelValue;
+		if (COMMON_CONSTANTS.containsKey(modeName)) {
+			g.tool.errMgr.grammarError(ErrorType.MODE_CONFLICTS_WITH_COMMON_CONSTANTS, g.fileName, token, token.getText());
+			return null;
 		}
 
 		List<String> modeNames = new ArrayList<String>(((LexerGrammar)g).modes.keySet());
-		int mode = modeNames.indexOf(name);
+		int mode = modeNames.indexOf(modeName);
 		if (mode >= 0) {
 			return mode;
 		}
 
 		try {
-			return Integer.parseInt(name);
+			return Integer.parseInt(modeName);
 		} catch (NumberFormatException ex) {
-			g.tool.errMgr.grammarError(ErrorType.UNKNOWN_LEXER_CONSTANT, g.fileName, token, currentRule.name, token != null ? token.getText() : null);
+			g.tool.errMgr.grammarError(ErrorType.CONSTANT_VALUE_IS_NOT_A_RECOGNIZED_MODE_NAME, g.fileName, token, token.getText());
+			return null;
+		}
+	}
+
+	private Integer getTokenConstantValue(String tokenName, Token token) {
+		if (tokenName == null) {
+			return null;
+		}
+
+		if (tokenName.equals("EOF")) {
+			return Lexer.EOF;
+		}
+		if (COMMON_CONSTANTS.containsKey(tokenName)) {
+			g.tool.errMgr.grammarError(ErrorType.TOKEN_CONFLICTS_WITH_COMMON_CONSTANTS, g.fileName, token, token.getText());
+			return null;
+		}
+
+		int tokenType = g.getTokenType(tokenName);
+		if (tokenType != org.antlr.v4.runtime.Token.INVALID_TYPE) {
+			return tokenType;
+		}
+
+		try {
+			return Integer.parseInt(tokenName);
+		} catch (NumberFormatException ex) {
+			g.tool.errMgr.grammarError(ErrorType.CONSTANT_VALUE_IS_NOT_A_RECOGNIZED_TOKEN_NAME, g.fileName, token, token.getText());
+			return null;
+		}
+	}
+
+	private Integer getChannelConstantValue(String channelName, Token token) {
+		if (channelName == null) {
+			return null;
+		}
+
+		if (channelName.equals("HIDDEN")) {
+			return Lexer.HIDDEN;
+		}
+		if (channelName.equals("DEFAULT_TOKEN_CHANNEL")) {
+			return Lexer.DEFAULT_TOKEN_CHANNEL;
+		}
+		if (COMMON_CONSTANTS.containsKey(channelName)) {
+			g.tool.errMgr.grammarError(ErrorType.CHANNEL_CONFLICTS_WITH_COMMON_CONSTANTS, g.fileName, token, token.getText());
+			return null;
+		}
+
+		int channelValue = g.getChannelValue(channelName);
+		if (channelValue >= org.antlr.v4.runtime.Token.MIN_USER_CHANNEL_VALUE) {
+			return channelValue;
+		}
+
+		try {
+			return Integer.parseInt(channelName);
+		} catch (NumberFormatException ex) {
+			g.tool.errMgr.grammarError(ErrorType.CONSTANT_VALUE_IS_NOT_A_RECOGNIZED_CHANNEL_NAME, g.fileName, token, token.getText());
 			return null;
 		}
 	}

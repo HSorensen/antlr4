@@ -1,39 +1,17 @@
 /*
- * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 
 package org.antlr.v4.automata;
 
+import org.antlr.v4.misc.CharSupport;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNState;
 import org.antlr.v4.runtime.atn.AtomTransition;
 import org.antlr.v4.runtime.atn.BlockEndState;
+import org.antlr.v4.runtime.atn.CodePointTransitions;
 import org.antlr.v4.runtime.atn.DecisionState;
 import org.antlr.v4.runtime.atn.EpsilonTransition;
 import org.antlr.v4.runtime.atn.NotSetTransition;
@@ -42,6 +20,7 @@ import org.antlr.v4.runtime.atn.SetTransition;
 import org.antlr.v4.runtime.atn.Transition;
 import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.misc.IntervalSet;
+import org.antlr.v4.tool.ErrorType;
 import org.antlr.v4.tool.Grammar;
 import org.antlr.v4.tool.Rule;
 
@@ -118,20 +97,41 @@ public class ATNOptimizer {
 					Transition matchTransition = decision.transition(j).target.transition(0);
 					if (matchTransition instanceof NotSetTransition) {
 						throw new UnsupportedOperationException("Not yet implemented.");
-					} else {
-						matchSet.addAll(matchTransition.label());
 					}
+					IntervalSet set =  matchTransition.label();
+					List<Interval> intervals = set.getIntervals();
+					int n = intervals.size();
+					for (int k = 0; k < n; k++) {
+						Interval setInterval = intervals.get(k);
+						int a = setInterval.a;
+						int b = setInterval.b;
+						if (a != -1 && b != -1) {
+							for (int v = a; v <= b; v++) {
+								if (matchSet.contains(v)) {
+									// TODO: Token is missing (i.e. position in source will not be displayed).
+									g.tool.errMgr.grammarError(ErrorType.CHARACTERS_COLLISION_IN_SET, g.fileName,
+											null,
+											CharSupport.getANTLRCharLiteralForChar(v),
+											CharSupport.getIntervalSetEscapedString(matchSet));
+									break;
+								}
+							}
+						}
+					}
+					matchSet.addAll(set);
 				}
 
 				Transition newTransition;
 				if (matchSet.getIntervals().size() == 1) {
 					if (matchSet.size() == 1) {
-						newTransition = new AtomTransition(blockEndState, matchSet.getMinElement());
-					} else {
-						Interval matchInterval = matchSet.getIntervals().get(0);
-						newTransition = new RangeTransition(blockEndState, matchInterval.a, matchInterval.b);
+						newTransition = CodePointTransitions.createWithCodePoint(blockEndState, matchSet.getMinElement());
 					}
-				} else {
+					else {
+						Interval matchInterval = matchSet.getIntervals().get(0);
+						newTransition = CodePointTransitions.createWithCodePointRange(blockEndState, matchInterval.a, matchInterval.b);
+					}
+				}
+				else {
 					newTransition = new SetTransition(blockEndState, matchSet);
 				}
 

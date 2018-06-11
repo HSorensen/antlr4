@@ -1,34 +1,10 @@
-/*
- * [The "BSD license"]
- *  Copyright (c) 2013 Terence Parr
- *  Copyright (c) 2013 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 using System;
 using System.IO;
+using System.Text;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Sharpen;
@@ -52,7 +28,7 @@ namespace Antlr4.Runtime
         /// resets so
         /// we start filling at index 0 again.
         /// </remarks>
-        protected internal char[] data;
+        protected internal int[] data;
 
         /// <summary>
         /// The number of characters currently in
@@ -144,7 +120,7 @@ namespace Antlr4.Runtime
         public UnbufferedCharStream(int bufferSize)
         {
             n = 0;
-            data = new char[bufferSize];
+            data = new int[bufferSize];
         }
 
         public UnbufferedCharStream(Stream input)
@@ -175,7 +151,7 @@ namespace Antlr4.Runtime
         // prime
         public virtual void Consume()
         {
-            if (La(1) == IntStreamConstants.Eof)
+            if (LA(1) == IntStreamConstants.EOF)
             {
                 throw new InvalidOperationException("cannot consume EOF");
             }
@@ -236,13 +212,52 @@ namespace Antlr4.Runtime
         {
             for (int i = 0; i < n; i++)
             {
-                if (this.n > 0 && data[this.n - 1] == unchecked((char)IntStreamConstants.Eof))
+                if (this.n > 0 && data[this.n - 1] == IntStreamConstants.EOF)
                 {
                     return i;
                 }
 
                 int c = NextChar();
-                Add(c);
+                if (c > char.MaxValue || c == IntStreamConstants.EOF)
+                {
+                    Add(c);
+                }
+                else
+                {
+                    char ch = unchecked((char)c);
+                    if (Char.IsLowSurrogate(ch))
+                    {
+                        throw new ArgumentException("Invalid UTF-16 (low surrogate with no preceding high surrogate)");
+                    }
+                    else if (Char.IsHighSurrogate(ch))
+                    {
+                        int lowSurrogate = NextChar();
+                        if (lowSurrogate > char.MaxValue)
+                        {
+                            throw new ArgumentException("Invalid UTF-16 (high surrogate followed by code point > U+FFFF");
+                        }
+                        else if (lowSurrogate == IntStreamConstants.EOF)
+                        {
+                            throw new ArgumentException("Invalid UTF-16 (low surrogate with no preceding high surrogate)");
+                        }
+                        else
+                        {
+                            char lowSurrogateChar = unchecked((char)lowSurrogate);
+                            if (Char.IsLowSurrogate(lowSurrogateChar))
+                            {
+                                Add(Char.ConvertToUtf32(ch, lowSurrogateChar));
+                            }
+                            else
+                            {
+                                throw new ArgumentException("Invalid UTF-16 (low surrogate with no preceding high surrogate)");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Add(c);
+                    }
+                }
             }
             return n;
         }
@@ -264,10 +279,10 @@ namespace Antlr4.Runtime
             {
                 data = Arrays.CopyOf(data, data.Length * 2);
             }
-            data[n++] = (char)c;
+            data[n++] = c;
         }
 
-        public virtual int La(int i)
+        public virtual int LA(int i)
         {
             if (i == -1)
             {
@@ -282,14 +297,9 @@ namespace Antlr4.Runtime
             }
             if (index >= n)
             {
-                return IntStreamConstants.Eof;
+                return IntStreamConstants.EOF;
             }
-            char c = data[index];
-            if (c == unchecked((char)IntStreamConstants.Eof))
-            {
-                return IntStreamConstants.Eof;
-            }
-            return c;
+            return data[index];
         }
 
         /// <summary>Return a marker that we can release later.</summary>
@@ -420,7 +430,7 @@ namespace Antlr4.Runtime
                 throw new ArgumentException("invalid interval");
             }
             int bufferStartIndex = BufferStartIndex;
-            if (n > 0 && data[n - 1] == char.MaxValue)
+            if (n > 0 && data[n - 1] == IntStreamConstants.EOF)
             {
                 if (interval.a + interval.Length > bufferStartIndex + n)
                 {
@@ -433,7 +443,12 @@ namespace Antlr4.Runtime
             }
             // convert from absolute to local index
             int i = interval.a - bufferStartIndex;
-            return new string(data, i, interval.Length);
+            // build a UTF-16 string from the Unicode code points in data
+            var sb = new StringBuilder(interval.Length);
+            for (int offset = 0; offset < interval.Length; offset++) {
+                sb.Append(Char.ConvertFromUtf32(data[i + offset]));
+            }
+            return sb.ToString();
         }
 
         protected internal int BufferStartIndex

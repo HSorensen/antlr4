@@ -1,31 +1,6 @@
-/*
- * [The "BSD license"]
- *  Copyright (c) 2013 Terence Parr
- *  Copyright (c) 2013 Sam Harwell
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
+ * Use of this file is governed by the BSD 3-clause license that
+ * can be found in the LICENSE.txt file in the project root.
  */
 using System;
 using System.Collections.Generic;
@@ -48,6 +23,18 @@ namespace Antlr4.Runtime.Atn
         private static readonly Guid BaseSerializedUuid;
 
         /// <summary>
+        /// This UUID indicates the serialized ATN contains two sets of
+        /// IntervalSets, where the second set's values are encoded as
+        /// 32-bit integers to support the full Unicode SMP range up to U+10FFFF.
+        /// </summary>
+        /// <remarks>
+        /// This UUID indicates the serialized ATN contains two sets of
+        /// IntervalSets, where the second set's values are encoded as
+        /// 32-bit integers to support the full Unicode SMP range up to U+10FFFF.
+        /// </remarks>
+        private static readonly Guid AddedUnicodeSmp;
+
+        /// <summary>
         /// This list contains all of the currently supported UUIDs, ordered by when
         /// the feature first appeared in this branch.
         /// </summary>
@@ -64,13 +51,17 @@ namespace Antlr4.Runtime.Atn
         static ATNDeserializer()
         {
 			BaseSerializedUuid = new Guid("AADB8D7E-AEEF-4415-AD2B-8204D6CF042E");
+			AddedUnicodeSmp = new Guid("59627784-3BE5-417A-B9EB-8131A7286089");
             SupportedUuids = new List<Guid>();
             SupportedUuids.Add(BaseSerializedUuid);
-			SerializedUuid = BaseSerializedUuid;
+            SupportedUuids.Add(AddedUnicodeSmp);
+			SerializedUuid = AddedUnicodeSmp;
         }
 
         [NotNull]
         private readonly ATNDeserializationOptions deserializationOptions;
+
+        private Guid uuid;
 
         public ATNDeserializer()
             : this(ATNDeserializationOptions.Default)
@@ -106,7 +97,7 @@ namespace Antlr4.Runtime.Atn
         /// currently being deserialized.
         /// </param>
         /// <returns>
-        /// 
+        ///
         /// <see langword="true"/>
         /// if the
         /// <paramref name="actualUuid"/>
@@ -140,7 +131,11 @@ namespace Antlr4.Runtime.Atn
 			ReadStates (atn);
 			ReadRules (atn);
 			ReadModes (atn);
-			IList<IntervalSet> sets = ReadSets (atn);
+			IList<IntervalSet> sets = new List<IntervalSet>();
+			ReadSets (atn, sets, this.ReadInt);
+			if (IsFeatureSupported(AddedUnicodeSmp, uuid)) {
+				ReadSets (atn, sets, this.ReadInt32);
+			}
 			ReadEdges (atn, sets);
 			ReadDecisions (atn);
 			ReadLexerActions (atn);
@@ -270,7 +265,7 @@ namespace Antlr4.Runtime.Atn
 				// reverify after modification
 				VerifyATN(atn);
 			}
-		}		
+		}
 
 		protected internal virtual void ReadLexerActions(ATN atn)
 		{
@@ -296,7 +291,7 @@ namespace Antlr4.Runtime.Atn
 					ILexerAction lexerAction = LexerActionFactory(actionType, data1, data2);
 					atn.lexerActions[i_10] = lexerAction;
 				}
-			}		
+			}
 		}
 
 		protected internal virtual void ReadDecisions(ATN atn)
@@ -403,12 +398,11 @@ namespace Antlr4.Runtime.Atn
 			}
 		}
 
-		protected internal virtual IList<IntervalSet> ReadSets(ATN atn)
+		protected internal virtual void ReadSets(ATN atn, IList<IntervalSet> sets, Func<int> readUnicode)
 		{
 			//
 			// SETS
 			//
-			IList<IntervalSet> sets = new List<IntervalSet>();
 			int nsets = ReadInt();
 			for (int i_8 = 0; i_8 < nsets; i_8++)
 			{
@@ -422,10 +416,9 @@ namespace Antlr4.Runtime.Atn
 				}
 				for (int j = 0; j < nintervals; j++)
 				{
-					set.Add(ReadInt(), ReadInt());
+					set.Add(readUnicode(), readUnicode());
 				}
 			}
-			return sets;
 		}
 
 		protected internal virtual void ReadModes(ATN atn)
@@ -466,7 +459,7 @@ namespace Antlr4.Runtime.Atn
 				if (atn.grammarType == ATNType.Lexer) {
 					int tokenType = ReadInt ();
 					if (tokenType == unchecked((int)(0xFFFF))) {
-						tokenType = TokenConstants.Eof;
+						tokenType = TokenConstants.EOF;
 					}
 					atn.ruleToTokenType [i_5] = tokenType;
 				}
@@ -555,7 +548,7 @@ namespace Antlr4.Runtime.Atn
 
 		protected internal virtual void CheckUUID()
 		{
-			Guid uuid = ReadUUID();
+			uuid = ReadUUID();
 			if (!SupportedUuids.Contains(uuid))
 			{
 				string reason = string.Format(CultureInfo.CurrentCulture, "Could not deserialize ATN with UUID {0} (expected {1} or a legacy UUID).", uuid, SerializedUuid);
@@ -590,7 +583,7 @@ namespace Antlr4.Runtime.Atn
         /// <see cref="StarLoopEntryState"/>
         /// states in the specified ATN to set
         /// the
-        /// <see cref="StarLoopEntryState.precedenceRuleDecision"/>
+        /// <see cref="StarLoopEntryState.isPrecedenceDecision"/>
         /// field to the
         /// correct value.
         /// </summary>
@@ -610,7 +603,7 @@ namespace Antlr4.Runtime.Atn
                     {
                         if (maybeLoopEndState.epsilonOnlyTransitions && maybeLoopEndState.Transition(0).target is RuleStopState)
                         {
-                            ((StarLoopEntryState)state).precedenceRuleDecision = true;
+							((StarLoopEntryState)state).isPrecedenceDecision = true;
                         }
                     }
                 }
@@ -708,7 +701,7 @@ namespace Antlr4.Runtime.Atn
             {
                 RuleStartState startState = atn.ruleToStartState[i];
                 ATNState middleState = startState;
-                while (middleState.OnlyHasEpsilonTransitions && middleState.NumberOfOptimizedTransitions == 1 && middleState.GetOptimizedTransition(0).TransitionType == TransitionType.Epsilon)
+                while (middleState.OnlyHasEpsilonTransitions && middleState.NumberOfOptimizedTransitions == 1 && middleState.GetOptimizedTransition(0).TransitionType == TransitionType.EPSILON)
                 {
                     middleState = middleState.GetOptimizedTransition(0).target;
                 }
@@ -724,16 +717,16 @@ namespace Antlr4.Runtime.Atn
                 }
                 switch (matchTransition.TransitionType)
                 {
-                    case TransitionType.Atom:
-                    case TransitionType.Range:
-                    case TransitionType.Set:
+                    case TransitionType.ATOM:
+                    case TransitionType.RANGE:
+                    case TransitionType.SET:
                     {
                         ruleToInlineTransition[i] = matchTransition;
                         break;
                     }
 
-                    case TransitionType.NotSet:
-                    case TransitionType.Wildcard:
+                    case TransitionType.NOT_SET:
+                    case TransitionType.WILDCARD:
                     {
                         // not implemented yet
                         continue;
@@ -790,19 +783,19 @@ namespace Antlr4.Runtime.Atn
                     optimizedTransitions.Add(new EpsilonTransition(intermediateState));
                     switch (effective.TransitionType)
                     {
-                        case TransitionType.Atom:
+                        case TransitionType.ATOM:
                         {
 							intermediateState.AddTransition(new AtomTransition(target, ((AtomTransition)effective).token));
                             break;
                         }
 
-                        case TransitionType.Range:
+                        case TransitionType.RANGE:
                         {
                             intermediateState.AddTransition(new RangeTransition(target, ((RangeTransition)effective).from, ((RangeTransition)effective).to));
                             break;
                         }
 
-                        case TransitionType.Set:
+                        case TransitionType.SET:
                         {
                             intermediateState.AddTransition(new SetTransition(target, effective.Label));
                             break;
@@ -846,7 +839,7 @@ namespace Antlr4.Runtime.Atn
                 {
                     Transition transition = state.GetOptimizedTransition(i);
                     ATNState intermediate = transition.target;
-                    if (transition.TransitionType != TransitionType.Epsilon || ((EpsilonTransition)transition).OutermostPrecedenceReturn != -1 || intermediate.StateType != StateType.Basic || !intermediate.OnlyHasEpsilonTransitions)
+                    if (transition.TransitionType != TransitionType.EPSILON || ((EpsilonTransition)transition).OutermostPrecedenceReturn != -1 || intermediate.StateType != StateType.Basic || !intermediate.OnlyHasEpsilonTransitions)
                     {
                         if (optimizedTransitions != null)
                         {
@@ -856,7 +849,7 @@ namespace Antlr4.Runtime.Atn
                     }
                     for (int j = 0; j < intermediate.NumberOfOptimizedTransitions; j++)
                     {
-                        if (intermediate.GetOptimizedTransition(j).TransitionType != TransitionType.Epsilon || ((EpsilonTransition)intermediate.GetOptimizedTransition(j)).OutermostPrecedenceReturn != -1)
+                        if (intermediate.GetOptimizedTransition(j).TransitionType != TransitionType.EPSILON || ((EpsilonTransition)intermediate.GetOptimizedTransition(j)).OutermostPrecedenceReturn != -1)
                         {
                             if (optimizedTransitions != null)
                             {
@@ -1069,7 +1062,7 @@ nextTransition_continue: ;
                 IList<Transition> transitions = optimizedPath ? state.optimizedTransitions : state.transitions;
                 foreach (Transition t in transitions)
                 {
-                    if (t.TransitionType != TransitionType.Epsilon)
+                    if (t.TransitionType != TransitionType.EPSILON)
                     {
                         return false;
                     }
@@ -1099,7 +1092,10 @@ nextTransition_continue: ;
         protected internal Guid ReadUUID()
         {
 			byte[] d = BitConverter.GetBytes (ReadLong ());
-			Array.Reverse(d);
+			if(BitConverter.IsLittleEndian)
+			{
+				Array.Reverse(d);
+			}
 			short c = (short)ReadInt();
 			short b = (short)ReadInt();
 			int a = ReadInt32();
@@ -1112,16 +1108,16 @@ nextTransition_continue: ;
             ATNState target = atn.states[trg];
             switch (type)
             {
-                case TransitionType.Epsilon:
+                case TransitionType.EPSILON:
                 {
                     return new EpsilonTransition(target);
                 }
 
-                case TransitionType.Range:
+                case TransitionType.RANGE:
                 {
                     if (arg3 != 0)
                     {
-                        return new RangeTransition(target, TokenConstants.Eof, arg2);
+                        return new RangeTransition(target, TokenConstants.EOF, arg2);
                     }
                     else
                     {
@@ -1129,28 +1125,28 @@ nextTransition_continue: ;
                     }
                 }
 
-                case TransitionType.Rule:
+                case TransitionType.RULE:
                 {
                     RuleTransition rt = new RuleTransition((RuleStartState)atn.states[arg1], arg2, arg3, target);
                     return rt;
                 }
 
-                case TransitionType.Predicate:
+                case TransitionType.PREDICATE:
                 {
                     PredicateTransition pt = new PredicateTransition(target, arg1, arg2, arg3 != 0);
                     return pt;
                 }
 
-                case TransitionType.Precedence:
+                case TransitionType.PRECEDENCE:
                 {
                     return new PrecedencePredicateTransition(target, arg1);
                 }
 
-                case TransitionType.Atom:
+                case TransitionType.ATOM:
                 {
                     if (arg3 != 0)
                     {
-                        return new AtomTransition(target, TokenConstants.Eof);
+                        return new AtomTransition(target, TokenConstants.EOF);
                     }
                     else
                     {
@@ -1158,23 +1154,23 @@ nextTransition_continue: ;
                     }
                 }
 
-                case TransitionType.Action:
+                case TransitionType.ACTION:
                 {
                     ActionTransition a = new ActionTransition(target, arg1, arg2, arg3 != 0);
                     return a;
                 }
 
-                case TransitionType.Set:
+                case TransitionType.SET:
                 {
                     return new SetTransition(target, sets[arg1]);
                 }
 
-                case TransitionType.NotSet:
+                case TransitionType.NOT_SET:
                 {
                     return new NotSetTransition(target, sets[arg1]);
                 }
 
-                case TransitionType.Wildcard:
+                case TransitionType.WILDCARD:
                 {
                     return new WildcardTransition(target);
                 }

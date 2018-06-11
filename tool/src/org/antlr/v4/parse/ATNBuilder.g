@@ -1,7 +1,7 @@
 /*
  * [The "BSD license"]
- *  Copyright (c) 2012 Terence Parr
- *  Copyright (c) 2012 Sam Harwell
+ *  Copyright (c) 2012-2016 Terence Parr
+ *  Copyright (c) 2012-2016 Sam Harwell
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -137,7 +137,7 @@ element returns [ATNFactory.Handle p]
 	|   ^(ACTION .)					{$p = factory.action((ActionAST)$ACTION);}
 	|   ^(SEMPRED .)				{$p = factory.sempred((PredAST)$SEMPRED);}
     |	^(NOT b=blockSet[true])		{$p = $b.p;}
-    |	LEXER_CHAR_SET					{$p = factory.charSetLiteral($start);}
+    |	LEXER_CHAR_SET				{$p = factory.charSetLiteral($start);}
 	;
 
 astOperand returns [ATNFactory.Handle p]
