@@ -6,6 +6,8 @@
 
 package org.antlr.v4.runtime;
 
+import java.io.Serializable;
+
 import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.misc.Pair;
 
@@ -13,7 +15,7 @@ import org.antlr.v4.runtime.misc.Pair;
  * This default implementation of {@link TokenFactory} creates
  * {@link CommonToken} objects.
  */
-public class CommonTokenFactory implements TokenFactory<CommonToken> {
+public class CommonTokenFactory implements TokenFactory<CommonToken>, Serializable {
 	/**
 	 * The default {@link CommonTokenFactory} instance.
 	 *
