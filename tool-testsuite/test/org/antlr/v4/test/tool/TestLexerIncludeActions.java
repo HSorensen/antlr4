@@ -31,12 +31,18 @@ package org.antlr.v4.test.tool;
 import java.io.File;
 import java.io.FileWriter;
 
-import org.antlr.v4.test.runtime.java.BaseTest;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class TestLexerIncludeActions extends BaseTest {
+public class TestLexerIncludeActions extends BaseJavaToolTest {
+	@Before
+	@Override
+	public void testSetUp() throws Exception {
+		super.testSetUp();
+	}
+	
 	// ----- ACTIONS --------------------------------------------------------
 
 	@Test public void testActionPerformIncludeSourceFile() throws Exception {
