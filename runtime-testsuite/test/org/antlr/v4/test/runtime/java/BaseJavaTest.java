@@ -452,6 +452,25 @@ public class BaseJavaTest implements RuntimeTestSupport {
 	}
 
 	protected String execLexer(String grammarFileName,
+            String grammarStr,
+            String lexerName,
+            String input,
+            ST template) {
+
+		boolean success = rawGenerateAndBuildRecognizer(grammarFileName,
+                                        grammarStr,
+                                        null,
+                                        lexerName);
+		assertTrue(success);
+		writeFile(tmpdir, "input", input);
+		writeLexerTestFile(lexerName, template);
+		compile("Test.java");
+		String output = execClass("Test");
+		return output;
+		}
+
+	
+	protected String execLexer(String grammarFileName,
 	                           String grammarStr,
 	                           String lexerName,
 	                           String input) {
@@ -990,6 +1009,26 @@ public class BaseJavaTest implements RuntimeTestSupport {
 			);
 
 		outputFileST.add("lexerName", lexerName);
+		writeFile(tmpdir, "Test.java", outputFileST.render());
+	}
+
+	protected void writeLexerTestFile(String lexerName, ST outputFileST) {
+//		ST outputFileST = new ST(
+//			"import java.nio.file.Paths;\n" +
+//			"import org.antlr.v4.runtime.*;\n" +
+//			"\n" +
+//			"public class Test {\n" +
+//			"    public static void main(String[] args) throws Exception {\n" +
+//			"        CharStream input = CharStreams.fromPath(Paths.get(args[0]));\n" +
+//			"        <lexerName> lex = new <lexerName>(input);\n" +
+//			"        CommonTokenStream tokens = new CommonTokenStream(lex);\n" +
+//			"        tokens.fill();\n" +
+//			"        for (Object t : tokens.getTokens()) System.out.println(t);\n" +
+//			(showDFA?"System.out.print(lex.getInterpreter().getDFA(Lexer.DEFAULT_MODE).toLexerString());\n":"")+
+//			"    }\n" +
+//			"}"
+//			);
+
 		writeFile(tmpdir, "Test.java", outputFileST.render());
 	}
 
