@@ -330,6 +330,11 @@ public class ATNSerializer {
 					data.add(0);
 					break;
 
+				case READ_NEXT:
+					data.add(0);
+					data.add(0);
+					break;
+
 				case PUSH_MODE:
 					mode = ((LexerPushModeAction)action).getMode();
 					data.add(mode != -1 ? mode : 0xFFFF);

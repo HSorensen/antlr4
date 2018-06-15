@@ -72,20 +72,20 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	 */
 	public boolean _hitInclude;
 	
-	/** Store text for content to be included. */
-	public String _includeLexerText;
+//	/** Store text for content to be included. */
+//	public String _includeLexerText;
 
-	/** 
-	 * Keep track of lexerScanner states.
-	 * Needed to handling grammars that allow to include 
-	 * new content into the current scanning stream. 
-	 */
-	public final Stack<LexerScannerIncludeStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerIncludeStateStackItem>(); 
-
+//	/** 
+//	 * Keep track of lexerScanner states.
+//	 * Needed to handling grammars that allow to include 
+//	 * new content into the current scanning stream. 
+//	 */
+//	public final Stack<LexerScannerIncludeStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerIncludeStateStackItem>(); 
+//
 	/**
 	 * Default handler for including source code
 	 */
-	public LexerScannerIncludeSource _lexerScannerIncludeSource = new LexerScannerIncludeSourceImpl();
+	public LexerScannerIncludeSource2 _lexerScannerIncludeSource = new LexerScannerIncludeSourceImpl2();
 	
 	/** The channel number for the current token */
 	public int _channel;
@@ -146,21 +146,28 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 			while (true) {
 				if (_hitEOF) {
 					// check if any input has been stacked
-					if (!_lexerScannerStateStack.isEmpty()) {
-						popLexerScannerState( );
-						_hitEOF = false;
-					} else {
-						emitEOF();
-						return _token;
+					if (_lexerScannerIncludeSource.restorePrevious(this)) 
+					{
+					  	_hitEOF = false; // reset _hitEOF to continue processing restored file
 					}
+//					if (!_lexerScannerStateStack.isEmpty()) {
+//						popLexerScannerState( );
+//						_hitEOF = false;
+//					}
 				}
-
+				
+				
 				if (_hitInclude) {
 					// store current lexer state, and open _includeFileName for reading.
-					pushLexerScannerState( );
+					_lexerScannerIncludeSource.storeAndSwitch(this);
+					//pushLexerScannerState( ); // keep internal to storeAndSwitch( )
 					_hitInclude=false;					
 				}
 				
+				if (_hitEOF) {
+					emitEOF();
+					return _token;
+				}				
 				
 				_token = null;
 				_channel = Token.DEFAULT_CHANNEL;
@@ -445,6 +452,16 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		_input.consume();
 	}
 	
+	public void readNext()
+	{ 
+		if (_hitInclude == true) {
+			throw new IllegalStateException("readNext sequence error.");
+		}
+		
+		_hitInclude = true; // instruct scanner to prepare for switch of scan source
+//		_includeLexerText = getText();
+	}
+
 
 	/**
 	 * Prepare Lexer to scan next set of tokens from fileName.
@@ -462,67 +479,67 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		}
 		
 		_hitInclude = true; // instruct scanner to prepare for switch of scan source
-		_includeLexerText = lexerText;
+//		_includeLexerText = lexerText;
 	}
 
 
-	/**
-	 * Retrieve old lexer state and make it the current state.
-	 */
-	public void popLexerScannerState() {
-		if (_lexerScannerStateStack.isEmpty() == true) {
-			throw new IllegalStateException("popLexerScanner cannot operate on empty stack.");
-		}
-		LexerScannerIncludeStateStackItem stackItem=_lexerScannerStateStack.pop(); ;
-		// restore _input, _tokenFactorySourcePair, line and charPosInLine
-		int checkSize=0;
-		this._input=stackItem.getInput(); checkSize++;
-		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair(); checkSize++;
-		getInterpreter().setLine(stackItem.getLine()); checkSize++;
-		getInterpreter().setCharPositionInLine(stackItem.getCharPosInLine()); checkSize++;
-		
-		if (LexerScannerIncludeStateStackItem.SIZE != checkSize) {
-			throw new IllegalStateException("popLexerScanner lexer state not fully restored.");
-		}
-	}
-
-	/**
-	 * Store current lexer state, and open new file for input.
-	 */
-	public void pushLexerScannerState() {
-		if (_hitInclude == false) {
-			throw new IllegalStateException("pushLexerScanner requires performIncludeSourceFile action.");
-		}
-
-		// store current lexer scanner state
-		_lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(_input
-				                                                         , _tokenFactorySourcePair
-				                                                         , getInterpreter().getLine()
-				                                                         , getInterpreter().getCharPositionInLine()));
-		
-			// open _includeFileName ...
-			this._input = _lexerScannerIncludeSource.embedSource(_input.getSourceName()
-					,_tokenStartLine // getInterpreter().getLine()
-                    ,_tokenStartCharIndex
-					,_includeLexerText);  //track lineno?
-			
-			if (this._input==null) {
-				// An error happened so restore previous input
-				this._input=_lexerScannerStateStack.peek().getInput();
-			  _lexerScannerStateStack.pop();
-			}
-			else {
-				this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
-		        
-		        this._input.seek(0); // ensure position is set
-		        getInterpreter().reset();
-			}
-	}
+//	/**
+//	 * Retrieve old lexer state and make it the current state.
+//	 */
+//	public void popLexerScannerState() {
+//		if (_lexerScannerStateStack.isEmpty() == true) {
+//			throw new IllegalStateException("popLexerScanner cannot operate on empty stack.");
+//		}
+//		LexerScannerIncludeStateStackItem stackItem=_lexerScannerStateStack.pop(); ;
+//		// restore _input, _tokenFactorySourcePair, line and charPosInLine
+//		int checkSize=0;
+//		this._input=stackItem.getInput(); checkSize++;
+//		this._tokenFactorySourcePair=stackItem.getTokenFactorySourcePair(); checkSize++;
+//		getInterpreter().setLine(stackItem.getLine()); checkSize++;
+//		getInterpreter().setCharPositionInLine(stackItem.getCharPosInLine()); checkSize++;
+//		
+//		if (LexerScannerIncludeStateStackItem.SIZE != checkSize) {
+//			throw new IllegalStateException("popLexerScanner lexer state not fully restored.");
+//		}
+//	}
+//
+//	/**
+//	 * Store current lexer state, and open new file for input.
+//	 */
+//	public void pushLexerScannerState() {
+//		if (_hitInclude == false) {
+//			throw new IllegalStateException("pushLexerScanner requires performIncludeSourceFile action.");
+//		}
+//
+//		// store current lexer scanner state
+//		_lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(_input
+//				                                                         , _tokenFactorySourcePair
+//				                                                         , getInterpreter().getLine()
+//				                                                         , getInterpreter().getCharPositionInLine()));
+//		
+//			// open _includeFileName ...
+//			this._input = _lexerScannerIncludeSource.embedSource(_input.getSourceName()  // currentName
+//					,_tokenStartLine // getInterpreter().getLine()                       // currentLine
+//                    ,_tokenStartCharIndex                                                // currentLinePos
+//					,_includeLexerText);  //track lineno?                                // newFileName (lexer text matched)
+//			
+//			if (this._input==null) {
+//				// An error happened so restore previous input
+//				this._input=_lexerScannerStateStack.peek().getInput();
+//			  _lexerScannerStateStack.pop();
+//			}
+//			else {
+//				this._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(this, _input); 
+//		        
+//		        this._input.seek(0); // ensure position is set
+//		        getInterpreter().reset();
+//			}
+//	}
 	
 	/**
 	 * Set how the lexer handle inclusion of source code.
 	 * @param LexerScannerIncludeSource
 	 */
-	public void setLexerScannerIncludeSource( LexerScannerIncludeSource lsis) {_lexerScannerIncludeSource=lsis;}
+	public void setLexerScannerIncludeSource( LexerScannerIncludeSource2 lsis) {_lexerScannerIncludeSource=lsis;}
 	
 }

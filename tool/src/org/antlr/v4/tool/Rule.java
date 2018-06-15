@@ -50,6 +50,7 @@ public class Rule implements AttributeResolver {
 		validLexerCommands.add("popMode");
 		validLexerCommands.add("skip");
 		validLexerCommands.add("more");
+		validLexerCommands.add("readNext"); 
 	}
 
 	public String name;

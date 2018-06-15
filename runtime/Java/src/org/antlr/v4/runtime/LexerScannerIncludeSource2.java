@@ -33,15 +33,19 @@ package org.antlr.v4.runtime;
  * Interface that allow the lexer to include another file
  * into the scanning stream.
  */
-public interface LexerScannerIncludeSource {
+public interface LexerScannerIncludeSource2 {
+
+	/**
+	 * return
+	 * 	false iff real EOF
+	 *  true iff input has been restored
+	 */
+	public boolean restorePrevious(Lexer lexer);
 	
 	/**
-	 * The embedSource method deconstruct the matched lexer string and return a CharStream 
-	 * for the file or returning null in case of errors
+	 * store and switch
+	 * use lexer.getText() to get the matched text
 	 */
-	public CharStream embedSource(String lexerText);
-
-	public default CharStream embedSource(String currentName, int currentLine, int currentLinePos, String newFileName) { return embedSource(newFileName); }
+	public void storeAndSwitch(Lexer lexer);
 	
-
 }
