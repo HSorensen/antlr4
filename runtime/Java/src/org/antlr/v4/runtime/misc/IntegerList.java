@@ -5,8 +5,6 @@
  */
 package org.antlr.v4.runtime.misc;
 
-import java.io.Serializable;
-import java.lang.IllegalArgumentException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -15,7 +13,7 @@ import java.util.List;
  *
  * @author Sam Harwell
  */
-public class IntegerList implements Serializable {
+public class IntegerList {
 
 	private static int[] EMPTY_DATA = new int[0];
 

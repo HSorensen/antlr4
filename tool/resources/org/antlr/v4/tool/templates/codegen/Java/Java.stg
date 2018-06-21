@@ -687,12 +687,12 @@ catch (<catchArg>) {
 LexerSkipCommand()  ::= "skip();"
 LexerMoreCommand()  ::= "more();"
 LexerPopModeCommand() ::= "popMode();"
+LexerReadNextCommand()  ::= "readNext();"
 
 LexerTypeCommand(arg, grammar)      ::= "_type = <arg>;"
 LexerChannelCommand(arg, grammar)   ::= "_channel = <arg>;"
 LexerModeCommand(arg, grammar)      ::= "_mode = <arg>;"
 LexerPushModeCommand(arg, grammar)  ::= "pushMode(<arg>);"
-LexerReadNextCommand()  ::= "readNext();"
 
 ActionText(t) ::= "<t.text>"
 ActionTemplate(t) ::= "<t.st>"

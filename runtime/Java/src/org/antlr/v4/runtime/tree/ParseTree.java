@@ -50,12 +50,6 @@ public interface ParseTree extends SyntaxTree {
 	 *  comments if they are sent to parser on hidden channel.
 	 */
 	String getText();
-	
-	/** Return the combined text of all leaf nodes separated by the specified string.
-	 *  Does not get any off-channel tokens (if any) so won't return whitespace and
-	 *  comments if they are sent to parser on hidden channel.
-	 */	
-	String getText(String separator);
 
 	/** Specialize toStringTree so that it can print out more information
 	 * 	based upon the parser.

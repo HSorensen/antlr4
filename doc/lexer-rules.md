@@ -305,3 +305,67 @@ As of 4.5, you can also define channel names like enumerations with the followin
 ```
 channels { WSCHANNEL, MYHIDDEN }
 ```
+
+### includeSource
+The lexer action `includeSource` allows for injecting source code into the scanning process.
+
+Sample lexer grammar:
+
+```antlr
+    lexer grammar L;
+    ID: 'A'..'Z' ;
+    CP: '#' ('0'|'1') ->includeSource,skip;
+    WS: (' '|'\n') -> skip ;
+```
+
+For example, when scanning the text `"A B C D #0 N O P"`, when `#0` is matched the grammar action `includeSource` is invoked with the matched text as parameter, here `"#0"`. This instructs the lexer to scane the next set of tokens using the parameter as filename.
+
+Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"`. 
+
+Using ANTLR to retrieve all the tokens would give:
+
+- [@0,0:0=`'A'`,<1>,1:0] <== offset zero from original file
+- [@1,2:2=`'B'`,<1>,1:2] <== original file
+- [@2,4:4=`'C'`,<1>,1:4] <== original file
+- [@3,6:6=`'D'`,<1>,1:6] <== original file
+- [@4,0:0=`'E'`,<1>,1:0] <== offset zero from file `#0`
+- [@5,2:2=`'F'`,<1>,1:2] <== File `#0`
+- [@6,4:4=`'G'`,<1>,1:4] <== File `#0`
+- [@7,0:0=`'H'`,<1>,1:0] <== offset zero from file `#1`
+- [@8,2:2=`'I'`,<1>,1:2] <== File `#1`
+- [@9,4:4=`'J'`,<1>,1:4] <== File `#1`
+- [@10,6:6=`'K'`,<1>,1:6] <== File `#1`
+- [@11,9:9=`'L'`,<1>,1:9] <== Back at file `#0`
+- [@12,11:11=`'M'`,<1>,1:11] <== File `#0`
+- [@13,11:11=`'N'`,<1>,1:11] <== Back at original file
+- [@14,13:13=`'O'`,<1>,1:13] <== original file
+- [@15,15:15=`'P'`,<1>,1:15] <== original file
+- [@16,16:15=`'<EOF>'`,<-1>,1:16] <== original file `DONE`
+
+Sample program:
+
+```java
+    L lex = new L(input);
+    CommonTokenStream tokens = new CommonTokenStream(lex);
+    tokens.fill();
+    for (Token t : tokens.getTokens()) {
+        System.out.print(t);
+        // Show filename where token originates from
+        if (t instanceof CommonToken) { System.out.print(","+((CommonToken)t).getInputStream().getSourceName()); }
+        System.out.println("");
+    }
+```
+
+The default behavior of `includeSource` is to use the matched text as a filename. 
+To override this behavior for example if you have to add a path or file extension to the matched filename there is a method `setLexerIncludeSource` that can be used to override the default behavior.
+
+```java 
+    lex.setLexerIncludeSource(new MyIncludeSource());
+    public class MyIncludeSource extends LexerIncludeSourceImpl {
+      @Override
+      public CharStream embedSource(String fName) {
+        String fileName = "COBOL/COPYBOOKS/"+fName+".cpy";
+        return super.embedSource(fileName);
+      }
+    }
+```

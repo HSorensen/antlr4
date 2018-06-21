@@ -6,14 +6,12 @@
 
 package org.antlr.v4.runtime.tree;
 
-import java.io.Serializable;
-
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.Interval;
 
-public class TerminalNodeImpl implements TerminalNode, Serializable {
+public class TerminalNodeImpl implements TerminalNode {
 	public Token symbol;
 	public ParseTree parent;
 
@@ -54,9 +52,6 @@ public class TerminalNodeImpl implements TerminalNode, Serializable {
 
 	@Override
 	public String getText() { return symbol.getText(); }
-
-	@Override
-	public String getText(String seperator) { return symbol.getText(); }
 
 	@Override
 	public String toStringTree(Parser parser) {

@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.Serializable;
 import java.util.Arrays;
 
 /**
@@ -23,7 +22,7 @@ import java.util.Arrays;
  *
  * @deprecated as of 4.7 Please use {@link CharStreams} interface.
  */
-public class ANTLRInputStream implements CharStream, Serializable {
+public class ANTLRInputStream implements CharStream {
     public static final int READ_BUFFER_SIZE = 1024;
    	public static final int INITIAL_BUFFER_SIZE = 1024;
 

@@ -28,24 +28,33 @@
  */
 package org.antlr.v4.runtime;
 
+import org.antlr.v4.runtime.misc.Pair;
+
 
 /**
- * Interface that allow the lexer to include another file
- * into the scanning stream.
+ * LexerIncludeStateStackItem
+ * Item needed for maintain scanner state when restoring scanning 
+ * from previous file
  */
-public interface LexerScannerIncludeSource2 {
-
-	/**
-	 * return
-	 * 	false iff real EOF
-	 *  true iff input has been restored
-	 */
-	public boolean restorePrevious(Lexer lexer);
+public class LexerIncludeStateStackItem {
+	public final static int SIZE=4;
+	private CharStream input;
+    private Pair<TokenSource, CharStream> tokenFactorySourcePair;
+    private int line;
+    private int charPosInLine;
+    
 	
-	/**
-	 * store and switch
-	 * use lexer.getText() to get the matched text
-	 */
-	public void storeAndSwitch(Lexer lexer);
+	public LexerIncludeStateStackItem(CharStream input,
+			Pair<TokenSource, CharStream> tokenFactorySourcePair, int line, int charPosInLine) {
+		this.input = input;
+		this.tokenFactorySourcePair = tokenFactorySourcePair;
+		this.line=line;
+		this.charPosInLine=charPosInLine;
+	}
+
+	public CharStream getInput() {return input;}
+	public Pair<TokenSource, CharStream> getTokenFactorySourcePair() {return tokenFactorySourcePair;}
+	public int getLine() {return line;}
+	public int getCharPosInLine() {return charPosInLine;}
 	
 }

@@ -12,11 +12,6 @@ import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.Trees;
 
-import javax.print.PrintException;
-import javax.swing.*;
-
-import java.io.IOException;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 
@@ -70,7 +65,7 @@ import java.util.List;
  *
  *  @see ParserRuleContext
  */
-public class RuleContext implements RuleNode, Serializable {
+public class RuleContext implements RuleNode {
 	public static final ParserRuleContext EMPTY = new ParserRuleContext();
 
 	/** What context invoked this rule? */
@@ -133,37 +128,18 @@ public class RuleContext implements RuleNode, Serializable {
 	 */
 	@Override
 	public String getText() {
-		return getText("");
-	}
-
-	/** Return the combined text of all child nodes separated by a string. 
-	 *  This method only considers tokens which have been added to the parse tree.
-	 *  <p>
-	 *  Since tokens on hidden channels (e.g. whitespace or comments) are not
-	 *  added to the parse trees, they will not appear in the output of this
-	 *  method.
-	 */
-	@Override
-	public String getText(String separator) {
 		if (getChildCount() == 0) {
 			return "";
 		}
-		
+
 		StringBuilder builder = new StringBuilder();
 		for (int i = 0; i < getChildCount(); i++) {
-			builder.append(getChild(i).getText(separator));
-			// check if recursion already appended a separator, and if not append it
-			if (separator.length()>0
-			&&  builder.length()>=separator.length()
-			&& !builder.substring(builder.length()-separator.length()).equals(separator)) {
-				builder.append(separator);
-			}
+			builder.append(getChild(i).getText());
 		}
 
 		return builder.toString();
 	}
 
-	
 	public int getRuleIndex() { return -1; }
 
 	/** For rule associated with this parse tree internal node, return

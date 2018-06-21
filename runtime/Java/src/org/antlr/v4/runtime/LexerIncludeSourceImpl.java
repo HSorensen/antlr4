@@ -38,7 +38,7 @@ import org.antlr.v4.runtime.misc.Pair;
  * into the scanning stream.
  * The lexer expects a CharStream object to be returned.
  */
-public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource2, Serializable {
+public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable {
 	
 	
 	/** 
@@ -46,10 +46,10 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 	 * Needed to handling grammars that allow to include 
 	 * new content into the current scanning stream. 
 	 */
-	public final Stack<LexerScannerIncludeStateStackItem> _lexerScannerStateStack = new Stack<LexerScannerIncludeStateStackItem>(); 
+	public final Stack<LexerIncludeStateStackItem> _lexerIncludeStateStack = new Stack<LexerIncludeStateStackItem>(); 
 
 	
-	public LexerScannerIncludeSourceImpl2() {
+	public LexerIncludeSourceImpl() {
 		
 	}
 
@@ -87,13 +87,13 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 	 */
 	public boolean restorePrevious(Lexer lexer) {
 
-		if (_lexerScannerStateStack.isEmpty() == true) {
+		if (_lexerIncludeStateStack.isEmpty() == true) {
 			return false;
 		}
 
 //		System.err.println(">> restorePrevious >"+lexer.getText()+"<"
 //				+ " stack size before >"+_lexerScannerStateStack.size()+"<");
-		LexerScannerIncludeStateStackItem stackItem=_lexerScannerStateStack.pop(); ;
+		LexerIncludeStateStackItem stackItem=_lexerIncludeStateStack.pop(); ;
 		// restore _input, _tokenFactorySourcePair, line and charPosInLine
 		int checkSize=0;
 		lexer._input=stackItem.getInput(); checkSize++;
@@ -101,7 +101,7 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 		lexer.getInterpreter().setLine(stackItem.getLine()); checkSize++;
 		lexer.getInterpreter().setCharPositionInLine(stackItem.getCharPosInLine()); checkSize++;
 		
-		if (LexerScannerIncludeStateStackItem.SIZE != checkSize) {
+		if (LexerIncludeStateStackItem.SIZE != checkSize) {
 			throw new IllegalStateException("restorePrevious lexer state not fully restored.");
 		}
 		
@@ -120,10 +120,10 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 		}
 
 		// store current lexer scanner state
-		_lexerScannerStateStack.push(new LexerScannerIncludeStateStackItem(lexer._input
-				                                                         , lexer._tokenFactorySourcePair
-				                                                         , lexer.getInterpreter().getLine()
-				                                                         , lexer.getInterpreter().getCharPositionInLine()));
+		_lexerIncludeStateStack.push(new LexerIncludeStateStackItem(lexer._input
+				                                                  , lexer._tokenFactorySourcePair
+				                                                  , lexer.getInterpreter().getLine()
+				                                                  , lexer.getInterpreter().getCharPositionInLine()));
 		
 			// open _includeFileName ...
 		lexer._input = embedSource(lexer._input.getSourceName()              // currentName
@@ -133,8 +133,8 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 			
 	    if (lexer._input==null) {
 				// An error happened so restore previous input
-				lexer._input=_lexerScannerStateStack.peek().getInput();
-			   _lexerScannerStateStack.pop();
+				lexer._input=_lexerIncludeStateStack.peek().getInput();
+			   _lexerIncludeStateStack.pop();
 	    }
 		else {
 			lexer._tokenFactorySourcePair = new Pair<TokenSource, CharStream>(lexer, lexer._input); 
@@ -142,7 +142,4 @@ public class LexerScannerIncludeSourceImpl2 implements LexerScannerIncludeSource
 			lexer.getInterpreter().reset();
 		}		
 	}
-		
-	
-	
 }
