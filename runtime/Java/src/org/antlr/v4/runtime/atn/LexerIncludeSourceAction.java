@@ -10,23 +10,22 @@ import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.misc.MurmurHash;
 
 /**
- * Implements the {@code pushMode} lexer action by calling
- * {@link Lexer#pushMode} with the assigned mode.
+ * Implements the {@code includeSource} lexer action by calling
+ * {@link Lexer#includeSource}.
  *
- * @author Sam Harwell
- * @since 4.2
+ * @author Henrik Sorensen
+ * @since 4.7
  */
-public final class LexerReadNextAction implements LexerAction {
+public final class LexerIncludeSourceAction implements LexerAction {
 	/**
 	 * Provides a singleton instance of this parameterless lexer action.
 	 */
-	public static final LexerReadNextAction INSTANCE = new LexerReadNextAction();
+	public static final LexerIncludeSourceAction INSTANCE = new LexerIncludeSourceAction();
 	
 	/**
-	 * Constructs a new {@code readNext} action with the specified mode value.
-	 * @param mode The mode value to pass to {@link Lexer#readNext}.
+	 * Constructs a new {@code includeSource} action with the specified mode value.
 	 */
-	public LexerReadNextAction() {
+	public LexerIncludeSourceAction() {
 	}
 
 	/**
@@ -35,7 +34,7 @@ public final class LexerReadNextAction implements LexerAction {
 	 */
 	@Override
 	public LexerActionType getActionType() {
-		return LexerActionType.READ_NEXT;
+		return LexerActionType.INCLUDE_SOURCE;
 	}
 
 	/**
@@ -55,7 +54,7 @@ public final class LexerReadNextAction implements LexerAction {
 	 */
 	@Override
 	public void execute(Lexer lexer) {
-		lexer.readNext();
+		lexer.includeSource();
 	}
 
 	@Override
@@ -73,6 +72,6 @@ public final class LexerReadNextAction implements LexerAction {
 
 	@Override
 	public String toString() {
-		return "readNext";
+		return "includeSource";
 	}
 }

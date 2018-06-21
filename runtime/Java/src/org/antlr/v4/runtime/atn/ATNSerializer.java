@@ -330,7 +330,7 @@ public class ATNSerializer {
 					data.add(0);
 					break;
 
-				case READ_NEXT:
+				case INCLUDE_SOURCE:
 					data.add(0);
 					data.add(0);
 					break;

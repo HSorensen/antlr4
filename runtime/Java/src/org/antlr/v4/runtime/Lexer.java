@@ -432,7 +432,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		_input.consume();
 	}
 	
-	public void readNext()
+	public void includeSource()
 	{ 
 		_hitIncludeSource = true; // instruct scanner to prepare for switch of scan source
 	}

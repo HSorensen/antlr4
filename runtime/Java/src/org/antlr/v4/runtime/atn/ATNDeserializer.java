@@ -779,8 +779,8 @@ public class ATNDeserializer {
 		case POP_MODE:
 			return LexerPopModeAction.INSTANCE;
 
-		case READ_NEXT:
-			return LexerReadNextAction.INSTANCE;
+		case INCLUDE_SOURCE:
+			return LexerIncludeSourceAction.INSTANCE;
 
 		case PUSH_MODE:
 			return new LexerPushModeAction(data1);

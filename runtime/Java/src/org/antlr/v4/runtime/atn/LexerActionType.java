@@ -34,9 +34,9 @@ public enum LexerActionType {
 	 */
 	POP_MODE,
 	/**
-	 * The type of a {@link LexerReadNextAction} action.
+	 * The type of a {@link LexerIncludeSourceAction} action.
 	 */
-	READ_NEXT,
+	INCLUDE_SOURCE,
 	/**
 	 * The type of a {@link LexerPushModeAction} action.
 	 */
