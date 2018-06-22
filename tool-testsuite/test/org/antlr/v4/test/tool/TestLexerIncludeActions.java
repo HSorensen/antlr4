@@ -48,7 +48,7 @@ public class TestLexerIncludeActions extends BaseJavaToolTest {
 	
 	// ----- ACTIONS --------------------------------------------------------
 	
-	@Test public void testActionReadNext() throws Exception {
+	@Test public void testActionIncludeSource() throws Exception {
 		ST outputFileST = new ST(
 		"import java.nio.file.Paths;\n" +
 		"import org.antlr.v4.runtime.*;\n" +
@@ -57,12 +57,12 @@ public class TestLexerIncludeActions extends BaseJavaToolTest {
 		"    public static void main(String[] args) throws Exception {\n" +
 		"        CharStream input = CharStreams.fromPath(Paths.get(args[0]));\n" +
 		"        <lexerName> lex = new <lexerName>(input);\n" +
-		"        lex.setLexerScannerIncludeSource( new IncludeScannerSource()) ;\n" +
+		"        lex.setLexerIncludeSource( new IncludeScannerSource()) ;\n" +
 		"        CommonTokenStream tokens = new CommonTokenStream(lex);\n" +
 		"        tokens.fill();\n" +
 		"        for (Object t : tokens.getTokens()) System.out.println(t);\n" +
 		"    }\n"
-		+ " public static class IncludeScannerSource extends LexerScannerIncludeSourceImpl2 {\n"
+		+ " public static class IncludeScannerSource extends LexerIncludeSourceImpl {\n"
 		+ "   @Override\n"
 		+ "   public CharStream embedSource(String currentName, int currentLine, int currentLinePos, String newFileName) { \n" + 
 		"		return embedSource(\"<path>\"+newFileName); \n" + 

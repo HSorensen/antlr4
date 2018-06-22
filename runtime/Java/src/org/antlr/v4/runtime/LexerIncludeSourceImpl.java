@@ -49,9 +49,7 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 	public final Stack<LexerIncludeStateStackItem> _lexerIncludeStateStack = new Stack<LexerIncludeStateStackItem>(); 
 
 	
-	public LexerIncludeSourceImpl() {
-		
-	}
+	public LexerIncludeSourceImpl() { }
 
 	/**
 	 * Override this method if exact tracking of included source files are needed.
@@ -86,14 +84,18 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 	 *  true iff input has been restored
 	 */
 	public boolean restorePrevious(Lexer lexer) {
+		if (lexer._hitEOF == false) {
+			throw new IllegalStateException("restorePrevious requires an EOF to be met.");
 
 		if (_lexerIncludeStateStack.isEmpty() == true) {
 			return false;
 		}
-
-//		System.err.println(">> restorePrevious >"+lexer.getText()+"<"
-//				+ " stack size before >"+_lexerScannerStateStack.size()+"<");
-		LexerIncludeStateStackItem stackItem=_lexerIncludeStateStack.pop(); ;
+		
+		if ( LexerATNSimulator.debug )
+		   System.err.println(">> restorePrevious >"+lexer.getText()+"<"
+			                + " stack size before >"+_lexerIncludeStateStack.size()+"<");
+		
+		LexerIncludeStateStackItem stackItem=_lexerIncludeStateStack.pop();
 		// restore _input, _tokenFactorySourcePair, line and charPosInLine
 		int checkSize=0;
 		lexer._input=stackItem.getInput(); checkSize++;
@@ -113,10 +115,12 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 	 * use lexer.getText() to get the matched text
 	 */
 	public void storeAndSwitch(Lexer lexer) {
-//		System.err.println(">> storeAndSwitch >"+lexer.getText()+"<"
-//				+ " stack size before >"+_lexerScannerStateStack.size()+"<");
-		if (lexer._hitInclude == false) {
-			throw new IllegalStateException("storeAndSwitch requires readNext action.");
+		if ( LexerATNSimulator.debug )
+			System.err.println(">> storeAndSwitch >"+lexer.getText()+"<"
+			                   " stack size before >"+_lexerIncludeStateStack.size()+"<");
+		
+		if (lexer._hitIncludeSource == false) {
+			throw new IllegalStateException("storeAndSwitch requires includeSource action.");
 		}
 
 		// store current lexer scanner state
@@ -126,10 +130,10 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 				                                                  , lexer.getInterpreter().getCharPositionInLine()));
 		
 			// open _includeFileName ...
-		lexer._input = embedSource(lexer._input.getSourceName()              // currentName
-					              ,lexer._tokenStartLine // getInterpreter().getLine()     // currentLine
-                                  ,lexer._tokenStartCharIndex                              // currentLinePos
-					              ,lexer.getText());  //track lineno?                      // newFileName (lexer text matched)
+		lexer._input = embedSource(lexer._input.getSourceName()    // currentName
+					              ,lexer._tokenStartLine           // currentLine
+                                  ,lexer._tokenStartCharIndex      // currentLinePos
+					              ,lexer.getText());               // newFileName (lexer text matched)
 			
 	    if (lexer._input==null) {
 				// An error happened so restore previous input

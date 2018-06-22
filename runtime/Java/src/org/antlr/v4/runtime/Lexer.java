@@ -65,13 +65,14 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 	public boolean _hitEOF;
 
 	/** 
-	 * Once a request to process an include file, nextToken() need to store 
-	 * current lexer state and read from the requested file.
+	 * Once a request to process the source from an included file has been made, 
+	 * nextToken() will store current lexer state and read from the requested file.
 	 */
 	public boolean _hitIncludeSource;
 	
 	/**
 	 * Default handler for including source code
+	 * Override default behavior by using setIncludeSource( ... )
 	 */
 	public LexerIncludeSource _lexerIncludeSource = new LexerIncludeSourceImpl();
 	
@@ -132,13 +133,13 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		try{
 			outer:
 			while (true) {
-				if (_hitEOF) {
-					// check if any input has been stacked
-					if (_lexerIncludeSource.restorePrevious(this)) 
-					  	_hitEOF = false; // reset _hitEOF to continue processing restored file
+				if (  _hitEOF  // check if any input need to be restored 
+				   && _lexerIncludeSource.restorePrevious(this)) {
+					// reset _hitEOF to continue processing restored file
+				   _hitEOF = false; 
 				}
 				
-				if (_hitIncludeSouce) {
+				if (_hitIncludeSource) {
 					// store current lexer state, and open _includeFileName for reading.
 					_lexerIncludeSource.storeAndSwitch(this);
 					_hitIncludeSource=false;					
@@ -432,9 +433,14 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 		_input.consume();
 	}
 	
+	/**
+	 * Lexer action includeSource
+	 * Instructs Lexer a request has been made to scan tokens from different fileName.
+	 */
 	public void includeSource()
 	{ 
-		_hitIncludeSource = true; // instruct scanner to prepare for switch of scan source
+		// instruct scanner to prepare for switch of source
+		_hitIncludeSource = true; 
 	}
 
 	/**

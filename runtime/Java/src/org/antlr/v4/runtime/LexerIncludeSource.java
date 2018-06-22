@@ -36,15 +36,19 @@ package org.antlr.v4.runtime;
 public interface LexerIncludeSource {
 
 	/**
-	 * return
+	 * restorePrevious is invoked from Lexer.nextToken() when an EOF is met.
+	 * This method is responsible for restorig the necessary lexer state.
+	 * Returns
 	 * 	false iff the internal stack is empty aka real EOF
 	 *  true iff input has been restored
 	 */
 	public boolean restorePrevious(Lexer lexer);
 	
 	/**
-	 * store and switch
-	 * use lexer.getText() to get the matched text
+	 * storeAndSwitch is invoked from Lexer.nextToken() when the 
+	 * lexer action includeSource has been executed.
+	 * Lexer.getText() contains the matched text for the lexer
+	 * rule where the includeSource action was executed.
 	 */
 	public void storeAndSwitch(Lexer lexer);
 	

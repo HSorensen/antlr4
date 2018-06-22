@@ -223,6 +223,7 @@ An alternative can have more than one command separated by commas. Here are the 
 * pushMode( x )
 * type( x )
 * channel( x )
+* includeSource
 
 See the book source code for usage, some examples of which are shown here:
 
@@ -318,9 +319,9 @@ Sample lexer grammar:
     WS: (' '|'\n') -> skip ;
 ```
 
-For example, when scanning the text `"A B C D #0 N O P"`, when `#0` is matched the grammar action `includeSource` is invoked with the matched text as parameter, here `"#0"`. This instructs the lexer to scane the next set of tokens using the parameter as filename.
+For example, when scanning the text `"A B C D #0 N O P"`, when `#0` is matched the grammar action `includeSource` is invoked with the matched text as parameter, here `#0`. This instructs the lexer to continue scanning from the `#0` file.
 
-Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"`. 
+Now imagine two files named `#0` and `#1` with content: `#0:"E F G #1 L M"` and `#1:"H I J K"` respectively. 
 
 Using ANTLR to retrieve all the tokens would give:
 
