@@ -45,7 +45,7 @@ public class Rule implements AttributeResolver {
 		validLexerCommands.add("pushMode");
 		validLexerCommands.add("type");
 		validLexerCommands.add("channel");
-		validLexerCommands.add("readNext"); 
+		validLexerCommands.add("includeSource"); 
 
 		// ACTIONS
 		validLexerCommands.add("popMode");

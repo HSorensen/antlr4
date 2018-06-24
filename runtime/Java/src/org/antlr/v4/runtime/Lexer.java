@@ -136,7 +136,7 @@ public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator>
 				if (  _hitEOF  // check if any input need to be restored 
 				   && _lexerIncludeSource.restorePrevious(this)) {
 					// reset _hitEOF to continue processing restored file
-				   _hitEOF = false; 
+				    _hitEOF = false; 
 				}
 				
 				if (_hitIncludeSource) {

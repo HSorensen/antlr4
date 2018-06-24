@@ -49,7 +49,7 @@ public final class LexerIncludeSourceAction implements LexerAction {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * <p>This action is implemented by calling {@link Lexer#readNext} with the
+	 * <p>This action is implemented by calling {@link Lexer#includeSource} with the
 	 * value provided by {@link #getMode}.</p>
 	 */
 	@Override

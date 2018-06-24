@@ -28,10 +28,12 @@
  */
 package org.antlr.v4.runtime;
 
+import org.antlr.v4.runtime.atn.LexerATNSimulator;
+import org.antlr.v4.runtime.misc.Pair;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Stack;
-import org.antlr.v4.runtime.misc.Pair;
 
 /**
  * Implementation of interface that allow the lexer to include another file
@@ -86,14 +88,15 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 	public boolean restorePrevious(Lexer lexer) {
 		if (lexer._hitEOF == false) {
 			throw new IllegalStateException("restorePrevious requires an EOF to be met.");
+		}
+		
+		if ( LexerATNSimulator.debug )
+		   System.out.println(">> restorePrevious >"+lexer.getText()+"<"
+			                + " stack size before >"+_lexerIncludeStateStack.size()+"<");
 
 		if (_lexerIncludeStateStack.isEmpty() == true) {
 			return false;
 		}
-		
-		if ( LexerATNSimulator.debug )
-		   System.err.println(">> restorePrevious >"+lexer.getText()+"<"
-			                + " stack size before >"+_lexerIncludeStateStack.size()+"<");
 		
 		LexerIncludeStateStackItem stackItem=_lexerIncludeStateStack.pop();
 		// restore _input, _tokenFactorySourcePair, line and charPosInLine
@@ -116,8 +119,8 @@ public class LexerIncludeSourceImpl implements LexerIncludeSource, Serializable 
 	 */
 	public void storeAndSwitch(Lexer lexer) {
 		if ( LexerATNSimulator.debug )
-			System.err.println(">> storeAndSwitch >"+lexer.getText()+"<"
-			                   " stack size before >"+_lexerIncludeStateStack.size()+"<");
+			System.out.println(">> storeAndSwitch >"+lexer.getText()+"<"
+			                   + " stack size before >"+_lexerIncludeStateStack.size()+"<");
 		
 		if (lexer._hitIncludeSource == false) {
 			throw new IllegalStateException("storeAndSwitch requires includeSource action.");
