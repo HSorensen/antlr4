@@ -82,12 +82,12 @@ conquer:
 unused[double input = 111] returns [double calculated] locals [int _a, double _b, int _c] @init{ doInit(); } @after { doAfter(); } :
 	stat
 ;
-catch [...] {
-  // Replaces the standard exception handling.
-}
-finally {
-  cleanUp();
-}
+//catch [...] {
+//  // Replaces the standard exception handling.
+//}
+//finally {
+//  cleanUp();
+//}
 
 unused2:
 	(unused[1] .)+ (Colon | Semicolon | Plus)? ~Semicolon
