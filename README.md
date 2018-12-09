@@ -188,7 +188,8 @@ public class TerminalNodeImpl implements TerminalNode, Serializable { }
 public abstract class ATNSimulator implements Serializable { }
 public abstract class Lexer extends Recognizer<Integer, LexerATNSimulator> implements TokenSource, Serializable { }
 public class CommonTokenFactory implements TokenFactory<CommonToken>, Serializable { }
-public class ANTLRInputStream implements CharStream, Serializable { }
+~~public class ANTLRInputStream implements CharStream, Serializable { } (Deprecated)~~
+public interface CharStream extends IntStream, Serializable { }
 public class IntegerList implements Serializable { }
 ```
 
